@@ -11,18 +11,22 @@
         "algolia sync"
     ],
     "support": {
-        "docs": "???",
-        "issues": "???"
+        "docs": "https://www.brilliancenw.com/algolia-sync",
+        "issues": "https://www.brilliancenw.com/algolia-sync"
     },
     "license": "MIT",
     "authors": [
         {
-            "name": "Mark Middleton",
-            "homepage": "https://www.markmiddleton.com/"
+            "name": "markmiddleton",
+            "homepage": "https://www.brilliancenw.com/about"
+        },
+        {
+            "name": "moorebrett0",
+            "homepage": "https://www.brilliancenw.com/about"
         }
     ],
     "require": {
-        "craftcms/cms": "^3.0.0-RC1",
+        "craftcms/cms": "^3.0.0",
         "algolia/algoliasearch-client-php": "^1"
     },
     "autoload": {
