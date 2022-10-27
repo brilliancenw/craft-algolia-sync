@@ -65,7 +65,7 @@ class AlgoliaSyncUtility extends Utility
      */
     public static function iconPath()
     {
-        return Craft::getAlias("@brilliance/algoliasync/assetbundles/algoliasync/dist/img/AlgoliaSync-icon.svg");
+        return Craft::getAlias("@brilliance/algoliasync/icon.svg");
     }
 
     /**
