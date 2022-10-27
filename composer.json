@@ -1,0 +1,44 @@
+{
+    "name": "brilliance/algolia-sync",
+    "description": "Syncing elements with Algolia using their API",
+    "type": "craft-plugin",
+    "version": "1.0.18",
+    "keywords": [
+        "craft",
+        "cms",
+        "craftcms",
+        "craft-plugin",
+        "algolia sync"
+    ],
+    "support": {
+        "docs": "???",
+        "issues": "???"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mark Middleton",
+            "homepage": "https://www.markmiddleton.com/"
+        }
+    ],
+    "require": {
+        "craftcms/cms": "^3.0.0-RC1",
+        "algolia/algoliasearch-client-php": "^1"
+    },
+    "autoload": {
+        "psr-4": {
+          "brilliance\\algoliasync\\": "src/"
+        }
+    },
+    "extra": {
+        "name": "Algolia Sync",
+        "handle": "algolia-sync",
+        "hasCpSettings": true,
+        "hasCpSection": false,
+        "changelogUrl": "???",
+        "components": {
+            "algoliaSyncService": "brilliance\\algoliasync\\services\\AlgoliaSyncService"
+        },
+        "class": "brilliance\\algoliasync\\AlgoliaSync"
+    }
+}

@@ -1,0 +1,25 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{% do view.registerAssetBundle('brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset') %}
+
+<h1>Bulk Load Records into Algolia</h1>
+
+{% set message = craft.app.session.getFlash('yourVariable') %}
+{%  if message %}
+    <h2>{{ message }}</h2>
+{%  endif %}
+
+<p>This will queue up every record from the specified record type to be entered into Algolia.  This will not create duplicates.  This does not purge any records that may already exist in Algolia that may have been removed from Craft.  You may want to "clear" the Index in Algolia prior to loading from here</p>
+<a href="{{ url() }}/settings/plugins/algolia-sync">Visit the Settings Page to Choose Which Element Types are Configured to Be Loaded into Algolia</a>
+<form action="/actions/algolia-sync/default/load-records" method="post" id="algoliaSyncLoad">
+    {{ csrfInput() }}
+    {%  for storageType,elementList in utilityData %}
+    <h3>{{ storageType }}</h3>
+        <ul>
+        {%  for item in elementList %}
+            <li><input type="checkbox" class='algoliaLoadCheckbox' name="loadRecords[]" value="{{ item.type }}|{{ item.id }}" /> Send all {{ item.name }} to sync with Algolia</li>
+        {%  endfor %}
+        </ul>
+    {% endfor %}
+    <p>&nbsp;</p>
+    <input type="submit" class="btn submit" value="Bulk Load Records" />
+</form>

@@ -1,0 +1,86 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Algolia Sync plugin for Craft CMS 3.x
+ *
+ * Algolia Sync Settings.twig
+ *
+ * @author    Mark Middleton
+ * @copyright Copyright (c) 2018 Mark Middleton
+ * @link      https://www.brilliancenw.com/
+ * @package   AlgoliaSync
+ * @since     1.0.0
+ */
+#}
+
+{% import "_includes/forms" as forms %}
+
+{% do view.registerAssetBundle("brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset") %}
+
+
+<p>Which Channel Sections to automatically sync with Algolia?</p>
+{{  forms.MultiSelect({
+    label: 'Sections to Sync with Algolia',
+    id: 'algoliaSections',
+    name: 'algoliaSections',
+    options: sectionsConfig,
+    values: settings['algoliaSections']
+}) }}
+
+<p>Which Category Sets to automatically sync with Algolia?</p>
+{{  forms.MultiSelect({
+    label: 'Category Groups to Sync with Algolia',
+    id: 'algoliaCategories',
+    name: 'algoliaCategories',
+    options: categoriesConfig,
+    values: settings['algoliaCategories']
+}) }}
+
+<p>Which user groups to sync to Algolia</p>
+{{  forms.MultiSelect({
+    label: 'User Groups to Sync with Algolia',
+    id: 'algoliaUserGroupList',
+    name: 'algoliaUserGroupList',
+    options: usersConfig,
+    values: settings['algoliaUserGroupList']
+}) }}
+
+<br>
+
+<a href="{{ url() }}/utilities/algolia-sync-utility" class="button">Visit the Utilities Page to Bulk Load Records</a>
+
+{{ forms.autosuggestField({
+    label: 'Algolia App',
+    id: 'algoliaApp',
+    name: 'algoliaApp',
+    value: settings['algoliaApp'],
+    suggestEnvVars: true
+}) }}
+
+
+{{ forms.autosuggestField({
+    label: 'Algolia Search Key',
+    id: 'algoliaSearch',
+    name: 'algoliaSearch',
+    value: settings['algoliaSearch'],
+    suggestEnvVars: true
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Algolia Admin Key',
+    id: 'algoliaAdmin',
+    name: 'algoliaAdmin',
+    value: settings['algoliaAdmin'],
+    suggestEnvVars: true
+}) }}
+
+<hr>
+
+{{ forms.autosuggestField({
+    label: 'Algolia Stop Word',
+    id: 'algoliaStopWord',
+    name: 'algoliaStopWord',
+    value: settings['algoliaStopWord'],
+    suggestEnvVars: true
+}) }}
+

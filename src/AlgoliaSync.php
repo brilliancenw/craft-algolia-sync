@@ -1,0 +1,370 @@
+<?php
+/**
+ * Algolia Sync plugin for Craft CMS 3.x
+ *
+ * Syncing elements with Algolia using their API
+ *
+ * @link      https://www.brilliancenw.com/
+ * @copyright Copyright (c) 2018 Mark Middleton
+ */
+
+namespace brilliance\algoliasync;
+
+use brilliance\algoliasync\services\AlgoliaSyncService as AlgoliaSyncServiceService;
+use brilliance\algoliasync\variables\AlgoliaSyncVariable;
+use brilliance\algoliasync\twigextensions\AlgoliaSyncTwigExtension;
+use brilliance\algoliasync\models\Settings;
+use brilliance\algoliasync\fields\AlgoliaSyncField as AlgoliaSyncFieldField;
+use brilliance\algoliasync\utilities\AlgoliaSyncUtility as AlgoliaSyncUtilityUtility;
+
+use Craft;
+use craft\base\Plugin;
+use craft\helpers\ElementHelper;
+use craft\services\Plugins;
+use craft\events\PluginEvent;
+use craft\services\Utilities;
+use craft\console\Application as ConsoleApplication;
+use craft\web\UrlManager;
+use craft\elements\Asset;
+use craft\services\Elements;
+use craft\services\Users;
+use craft\elements\User;
+use craft\services\Fields;
+use craft\web\twig\variables\CraftVariable;
+use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterUrlRulesEvent;
+
+use craft\events\ModelEvent;
+
+use yii\base\Event;
+
+/**
+ * Craft plugins are very much like little applications in and of themselves. We’ve made
+ * it as simple as we can, but the training wheels are off. A little prior knowledge is
+ * going to be required to write a plugin.
+ *
+ * For the purposes of the plugin docs, we’re going to assume that you know PHP and SQL,
+ * as well as some semi-advanced concepts like object-oriented programming and PHP namespaces.
+ *
+ * https://craftcms.com/docs/plugins/introduction
+ *
+ * @author    Mark Middleton
+ * @package   AlgoliaSync
+ * @since     1.0.0
+ *
+ * @property  AlgoliaSyncServiceService $algoliaSyncService
+ * @property  Settings $settings
+ * @method    Settings getSettings()
+ */
+
+// Example of calling this event from another plugin
+//        Event::on(
+//            \brilliance\algoliasync\services\AlgoliaSyncService::class,
+//            \brilliance\algoliasync\services\AlgoliaSyncService::EVENT_BEFORE_ALGOLIA_SYNC,
+//            function (\brilliance\algoliasync\events\beforeAlgoliaSyncEvent $event) {
+//
+//                $event->recordUpdate['attributes']['hoopla-custom'] = true;
+//
+//            }
+//        );
+
+
+class AlgoliaSync extends Plugin
+{
+    // Static Properties
+    // =========================================================================
+
+    /**
+     * Static property that is an instance of this plugin class so that it can be accessed via
+     * AlgoliaSync::$plugin
+     *
+     * @var AlgoliaSync
+     */
+    public static $plugin;
+
+    // Public Properties
+    // =========================================================================
+
+    /**
+     * To execute your plugin’s migrations, you’ll need to increase its schema version.
+     *
+     * @var string
+     */
+    public $schemaVersion = '1.0.1';
+
+
+    // Public Methods
+    // =========================================================================
+
+    /**
+     * Set our $plugin static property to this class so that it can be accessed via
+     * AlgoliaSync::$plugin
+     *
+     * Called after the plugin class is instantiated; do any one-time initialization
+     * here such as hooks and events.
+     *
+     * If you have a '/vendor/autoload.php' file, it will be loaded for you automatically;
+     * you do not need to load it in your init() method.
+     *
+     */
+    public function init()
+    {
+        parent::init();
+        self::$plugin = $this;
+
+        // Add in our Twig extensions
+        Craft::$app->view->registerTwigExtension(new AlgoliaSyncTwigExtension());
+
+        // Add in our console commands
+        if (Craft::$app instanceof ConsoleApplication) {
+            $this->controllerNamespace = 'brilliance\algoliasync\console\controllers';
+        }
+
+        // Register our site routes
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+            function (RegisterUrlRulesEvent $event) {
+                $event->rules['siteActionTrigger1'] = 'algolia-sync/default';
+            }
+        );
+
+        // Register our CP routes
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_CP_URL_RULES,
+            function (RegisterUrlRulesEvent $event) {
+                $event->rules['cpActionTrigger1'] = 'algolia-sync/default/do-something';
+            }
+        );
+
+        // Register our utilities
+        Event::on(
+            Utilities::class,
+            Utilities::EVENT_REGISTER_UTILITY_TYPES,
+            function (RegisterComponentTypesEvent $event) {
+                $event->types[] = AlgoliaSyncUtilityUtility::class;
+            }
+        );
+
+        // Register our fields
+        Event::on(
+            Fields::class,
+            Fields::EVENT_REGISTER_FIELD_TYPES,
+            function (RegisterComponentTypesEvent $event) {
+                $event->types[] = AlgoliaSyncFieldField::class;
+            }
+        );
+
+        // Register our variables
+        Event::on(
+            CraftVariable::class,
+            CraftVariable::EVENT_INIT,
+            function (Event $event) {
+                /** @var CraftVariable $variable */
+                $variable = $event->sender;
+                $variable->set('algoliaSync', AlgoliaSyncVariable::class);
+            }
+        );
+
+        // Do something after we're installed
+        Event::on(
+            Plugins::class,
+            Plugins::EVENT_AFTER_INSTALL_PLUGIN,
+            function (PluginEvent $event) {
+                if ($event->plugin === $this) {
+                    // We were just installed
+                }
+            }
+        );
+
+        Event::on(
+            Elements::class,
+            Elements::EVENT_AFTER_DELETE_ELEMENT,
+            function ($event) {
+
+                $thisEventId = (int)$event->element->id;
+
+                static $recursionLevel = 0;
+                static $recursiveRecord = array();
+
+                if (!in_array($thisEventId, $recursiveRecord)) {
+                    $recursionLevel++;
+                    $recursiveRecord[] = $thisEventId;
+
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->element, 'delete');
+                }
+
+                return $event;
+            }
+        );
+
+        Event::on(
+            User::class,
+            User::EVENT_AFTER_SAVE,
+            function (ModelEvent $event) {
+
+                $thisEventId = (int)$event->sender->id;
+
+                static $recursionLevel = 0;
+                static $recursiveRecord = array();
+
+                if (!in_array($thisEventId, $recursiveRecord)) {
+                    $recursionLevel++;
+                    $recursiveRecord[] = $thisEventId;
+
+                    $message = "USER - AFTER SAVE EVENT! ------------------------------------------------------- ";
+                    Craft::info($message, 'Algolia-Sync');
+
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->sender, 'save');
+                }
+
+                return $event;
+            }
+        );
+
+        Event::on(
+            Elements::class,
+            Elements::EVENT_AFTER_SAVE_ELEMENT,
+
+            function ($event) {
+
+                if ($event->element instanceof craft\elements\User || ElementHelper::isDraftOrRevision($event->element)) {
+                    return $event;
+                }
+
+                $thisEventId = (int)$event->element->id;
+
+                static $recursionLevel = 0;
+                static $recursiveRecord = array();
+
+                if (!in_array($thisEventId, $recursiveRecord)) {
+                    $recursionLevel++;
+                    $recursiveRecord[] = $thisEventId;
+
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->element, 'save');
+                }
+
+                return $event;
+            });
+
+        Event::on(
+            Users::class,
+            Users::EVENT_AFTER_ASSIGN_USER_TO_GROUPS,
+
+            function ($event) {
+
+                $user = User::find()->id($event->userId)->one();
+
+                if ($user) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user, 'save');
+                }
+
+                return $event;
+            });
+
+//        Event::on(
+//            Asset::class,
+//            Asset::EVENT_AFTER_SAVE,
+//            function (ModelEvent $event) {
+//                $message = substr(print_r($event->sender, true), 0, 1000);
+////                $file = Craft::getAlias('@storage/logs/algoliasync.log');
+////                $log = date('Y-m-d H:i:s').' '.$message."\n";
+////                craft\helpers\FileHelper::writeToFile($file, $log, ['append' => true]);
+//                return $event;
+//            }
+//        );
+
+
+
+/**
+ * Logging in Craft involves using one of the following methods:
+ *
+ * Craft::trace(): record a message to trace how a piece of code runs. This is mainly for development use.
+ * Craft::info(): record a message that conveys some useful information.
+ * Craft::warning(): record a warning message that indicates something unexpected has happened.
+ * Craft::error(): record a fatal error that should be investigated as soon as possible.
+ *
+ * Unless `devMode` is on, only Craft::warning() & Craft::error() will log to `craft/storage/logs/web.log`
+ *
+ * It's recommended that you pass in the magic constant `__METHOD__` as the second parameter, which sets
+ * the category to the method (prefixed with the fully qualified class name) where the constant appears.
+ *
+ * To enable the Yii debug toolbar, go to your user account in the AdminCP and check the
+ * [] Show the debug toolbar on the front end & [] Show the debug toolbar on the Control Panel
+ *
+ * http://www.yiiframework.com/doc-2.0/guide-runtime-logging.html
+ */
+        Craft::info(
+            Craft::t(
+                'algolia-sync',
+                '{name} plugin loaded',
+                ['name' => $this->name]
+            ),
+            __METHOD__
+        );
+    }
+
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * Creates and returns the model used to store the plugin’s settings.
+     *
+     * @return \craft\base\Model|null
+     */
+    protected function createSettingsModel()
+    {
+        return new Settings();
+    }
+
+    /**
+     * Returns the rendered settings HTML, which will be inserted into the content
+     * block on the settings page.
+     *
+     * @return string The rendered settings HTML
+     */
+
+    protected function settingsHtml(): string
+    {
+
+        // all Channel Sections
+        $sectionsConfig = array();
+        $rawSections = Craft::$app->getSections();
+        $allSections = $rawSections->getAllSections();
+
+        foreach ($allSections as $section) {
+            if ($section->type == 'channel') {
+                $sectionIndex = 'section-'.$section->id;
+                $sectionsConfig[$sectionIndex] = array('label' => $section->name, 'value' => $section->id);
+            }
+        }
+
+        // all Category Groups
+        $catGroups = Craft::$app->categories->getAllGroups();
+
+        $returnCatGroups = [];
+
+        foreach ($catGroups AS $group) {
+            $returnCatGroups[] = array('label' => $group->name, 'value' => $group->id);
+        }
+
+        // user groups list
+        $userGroups = Craft::$app->userGroups->getAllGroups();
+        $usersConfig = [];
+
+        foreach ($userGroups AS $group) {
+            $usersConfig[] = array('label' => $group->name, 'value' => $group->id);
+        }
+
+        return Craft::$app->view->renderTemplate(
+            'algolia-sync/settings',
+            [
+                'settings' => $this->getSettings(),
+                'sectionsConfig' => $sectionsConfig,
+                'categoriesConfig' => $returnCatGroups,
+                'usersConfig' => $usersConfig
+            ]
+        );
+    }
+}

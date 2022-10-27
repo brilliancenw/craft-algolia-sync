@@ -1,0 +1,26 @@
+{# @var craft \craft\web\twig\variables\CraftVariable #}
+{#
+/**
+ * Algolia Sync plugin for Craft CMS
+ *
+ * AlgoliaSyncField Field Settings
+ *
+ * @author    Mark Middleton
+ * @copyright Copyright (c) 2018 Mark Middleton
+ * @link      https://www.brilliancenw.com/
+ * @package   AlgoliaSync
+ * @since     1.0.0
+ */
+#}
+
+{% import "_includes/forms" as forms %}
+
+{% do view.registerAssetBundle("brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset") %}
+
+{{ forms.textField({
+    label: 'Some Attribute',
+    instructions: 'Enter some attribute here.',
+    id: 'someAttribute',
+    name: 'someAttribute',
+    value: field['someAttribute']})
+}}
