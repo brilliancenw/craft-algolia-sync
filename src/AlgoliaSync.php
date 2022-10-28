@@ -269,7 +269,7 @@ class AlgoliaSync extends Plugin
      *
      * @return \craft\base\Model|null
      */
-    protected function createSettingsModel()
+    protected function createSettingsModel() : \craft\base\Model|null
     {
         return new Settings();
     }

@@ -11,6 +11,7 @@
 namespace brilliance\algoliasync\twigextensions;
 
 use brilliance\algoliasync\AlgoliaSync;
+use \Twig\Extension\AbstractExtension;
 
 use Craft;
 
@@ -25,7 +26,7 @@ use Craft;
  * @package   AlgoliaSync
  * @since     1.0.0
  */
-class AlgoliaSyncTwigExtension extends \Twig_Extension
+class AlgoliaSyncTwigExtension extends AbstractExtension
 {
     // Public Methods
     // =========================================================================

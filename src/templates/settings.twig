@@ -5,7 +5,7 @@
  *
  * Algolia Sync Settings.twig
  *
- * @author    Mark Middleton
+ * @author    Brilliance Northwest LLC
  * @copyright Copyright (c) 2018 Mark Middleton
  * @link      https://www.brilliancenw.com/
  * @package   AlgoliaSync
@@ -17,48 +17,71 @@
 
 {% do view.registerAssetBundle("brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset") %}
 
-<p>Which Channel Sections to automatically sync with Algolia?</p>
-{{  forms.MultiSelect({
-    label: 'Sections to Sync with Algolia',
-    id: 'algoliaSections',
-    name: 'algoliaSections',
-    options: sectionsConfig,
-    values: settings['algoliaSections']
-}) }}
+<h4>Sections</h4>
+{% if sectionsConfig | length > 0 %}
+<p>Which Sections to automatically sync with Algolia?</p>
+    {% for section in sectionsConfig %}
+        {{ forms.checkboxField({
+            name:       'algoliaSections['~section.value~']',
+            value:      section.value,
+            label:      section.label,
+            checked:    section.value in settings.algoliaSections,
+            disabled:   false
+        }) }}
+    {% endfor %}
+{% else %}
+    <p>Your installation does not have any sections that can be configured to Sync</p>
+{% endif %}
 
+<h4>Categories</h4>
+{% if categoriesConfig | length > 0 %}
 <p>Which Category Sets to automatically sync with Algolia?</p>
-{{  forms.MultiSelect({
-    label: 'Category Groups to Sync with Algolia',
-    id: 'algoliaCategories',
-    name: 'algoliaCategories',
-    options: categoriesConfig,
-    values: settings['algoliaCategories']
-}) }}
+    {% for category in categoriesConfig %}
+        {{ forms.checkboxField({
+            name:       'algoliaCategories['~category.value~']',
+            value:      category.value,
+            label:      category.label,
+            checked:    category.value in settings.algoliaCategories,
+            disabled:   false
+        }) }}
+    {% endfor %}
+{% else %}
+    <p>Your installation does not have any Category Groups that can be configured to Sync</p>
+{% endif %}
 
-<p>Which user groups to sync to Algolia</p>
-{{  forms.MultiSelect({
-    label: 'User Groups to Sync with Algolia',
-    id: 'algoliaUserGroupList',
-    name: 'algoliaUserGroupList',
-    options: usersConfig,
-    values: settings['algoliaUserGroupList']
-}) }}
+{% set editionName = craft.app.getEditionName() | lower %}
 
+<h4>User Groups</h4>
+{% if usersConfig | length > 0 %}
+<p>Which User Groups to sync to Algolia</p>
+    {% for userGroup in usersConfig %}
+        {{ forms.checkboxField({
+            name:       'algoliaUserGroupList['~userGroup.value~']',
+            value:      userGroup.value,
+            label:      userGroup.label,
+            checked:    userGroup.value in settings.algoliaUserGroupList,
+            disabled:   false
+        }) }}
+    {% endfor %}
+{% elseif editionName == 'solo' %}
+    <p>Your Craft CMS edition is "Solo" and does not support User Groups</p>
+{% else %}
+    <p>Your installation does not have any User Groups that can be configured to Sync</p>
+{% endif %}
 <br>
 
-<a href="{{ cpUrl('utilities/algolia-sync-utility') }}" class="button">Visit the Utilities Page to Bulk Load Records</a>
+<a href="{{ cpUrl('utilities/algolia-sync-utility') }}">Visit the Utilities Page to Bulk Load Records</a>
 
 {{ forms.autosuggestField({
-    label: 'Algolia App',
+    label: 'Algolia Application ID',
     id: 'algoliaApp',
     name: 'algoliaApp',
     value: settings['algoliaApp'],
     suggestEnvVars: true
 }) }}
 
-
 {{ forms.autosuggestField({
-    label: 'Algolia Search Key',
+    label: 'Algolia Search-Only API Key',
     id: 'algoliaSearch',
     name: 'algoliaSearch',
     value: settings['algoliaSearch'],
@@ -66,7 +89,7 @@
 }) }}
 
 {{ forms.autosuggestField({
-    label: 'Algolia Admin Key',
+    label: 'Algolia Admin API Key',
     id: 'algoliaAdmin',
     name: 'algoliaAdmin',
     value: settings['algoliaAdmin'],

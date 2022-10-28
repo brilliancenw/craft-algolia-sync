@@ -13,11 +13,14 @@ namespace brilliance\algoliasync\services;
 use brilliance\algoliasync\AlgoliaSync;
 
 use Craft;
+use craft\helpers\App;
 use craft\base\Component;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
 
+use craft\web\twig\Environment;
+use Twig\Environment as env;
 
 use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
@@ -160,6 +163,7 @@ class AlgoliaSyncService extends Component
 
         Craft::info($message, 'algolia-sync');
 
+
         $queue = Craft::$app->getQueue();
         $queue->push(new AlgoliaSyncTask([
             'algoliaIndex' => $recordUpdate['index'],
@@ -272,7 +276,7 @@ class AlgoliaSyncService extends Component
 
     }
 
-    public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = null) {
+    public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '') {
 
         // do we update this type of element?
         $recordUpdate = array();
@@ -310,7 +314,7 @@ class AlgoliaSyncService extends Component
                 $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
             }
 
-            $fields = $element->getFieldLayout()->getFields();
+            $fields = $element->getFieldLayout()->customFields;
 
             foreach ($fields AS $field) {
 
@@ -470,16 +474,14 @@ class AlgoliaSyncService extends Component
     {
         $returnIndex = [];
 
-        if (getenv('ALGOLIA_INDEX_NAME') !== false) {
-            $returnIndex[] = getenv('ALGOLIA_INDEX_NAME');
-        }
-        else {
-            $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
+        $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
 
-            foreach ($eventInfo['sectionHandle'] AS $handle) {
-                $returnIndex[] = strtolower(getenv('ENVIRONMENT')).'_'.$eventInfo['type'].'_'.$handle;
-            }
+        $envName = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+
+        foreach ($eventInfo['sectionHandle'] AS $handle) {
+            $returnIndex[] = $envName.'_'.$eventInfo['type'].'_'.$handle;
         }
+
         return $returnIndex;
     }
 }
