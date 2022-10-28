@@ -17,18 +17,36 @@
 
 {% do view.registerAssetBundle("brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset") %}
 
-<h4>Sections</h4>
+<h1>Sections</h1>
 {% if sectionsConfig | length > 0 %}
 <p>Which Sections to automatically sync with Algolia?</p>
+    <table class="data fullwidth fixed-layout" dir="ltr">
+        <tbody>
+        <tr>
+            <th>Include section in Sync?</th>
+            <th>Default Index Name</th>
+            <th>Override Index Name</th>
+        </tr>
     {% for section in sectionsConfig %}
-        {{ forms.checkboxField({
-            name:       'algoliaSections['~section.value~']',
-            value:      section.value,
-            label:      section.label,
-            checked:    section.value in settings.algoliaSections,
-            disabled:   false
-        }) }}
+        {% set indexKey = "section-"~section.value %}
+            <tr>
+                <th class="light">{{ forms.checkboxField({
+                        name:       'algoliaSections['~section.value~']',
+                        value:      section.value,
+                        label:      section.label,
+                        checked:    section.value in settings.algoliaSections,
+                        disabled:   false
+                    }) }}</th>
+                <td>{{ section.default_index }}</td>
+                <td class="light">{{ forms.autosuggestField({
+                        name: "algoliaIndices["~indexKey~"]",
+                        value: settings['algoliaIndices']['section-'~section.value] ?? '',
+                        suggestEnvVars: true
+                    }) }}</td>
+            </tr>
     {% endfor %}
+        </tbody>
+    </table>
 {% else %}
     <p>Your installation does not have any sections that can be configured to Sync</p>
 {% endif %}

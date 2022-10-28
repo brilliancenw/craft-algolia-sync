@@ -43,6 +43,7 @@ class Settings extends Model
     public string $algoliaApp           = ''; // ALGOLIA_APP
     public string $algoliaSearch        = ''; // ALGOLIA_SEARCH
     public array $algoliaSections       = [];
+    public array $algoliaIndices        = [];
     public array $algoliaCategories     = [];
     public array $algoliaUserGroupList  = [];
     public array $algoliaLoadIndex      = [];
@@ -50,15 +51,15 @@ class Settings extends Model
 
     public function getAlgoliaAdmin(): string
     {
-        return (Craft::parseEnv($this->algoliaAdmin) ?? '');
+        return (getenv($this->algoliaAdmin) ?? '');
     }
     public function getAlgoliaApp(): string
     {
-        return (Craft::parseEnv($this->algoliaApp) ?? '');
+        return (getenv($this->algoliaApp) ?? '');
     }
     public function getAlgoliaSearch(): string
     {
-        return (Craft::parseEnv($this->algoliaSearch) ?? '');
+        return (getenv($this->algoliaSearch) ?? '');
     }
     public function rules(): array
     {

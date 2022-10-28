@@ -19,6 +19,7 @@ use brilliance\algoliasync\utilities\AlgoliaSyncUtility as AlgoliaSyncUtilityUti
 
 use Craft;
 use craft\base\Plugin;
+use craft\helpers\App;
 use craft\helpers\ElementHelper;
 use craft\services\Plugins;
 use craft\events\PluginEvent;
@@ -288,11 +289,12 @@ class AlgoliaSync extends Plugin
         $sectionsConfig = array();
         $rawSections = Craft::$app->getSections();
         $allSections = $rawSections->getAllSections();
+        $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
 
         foreach ($allSections as $section) {
             if ($section->type == 'channel') {
                 $sectionIndex = 'section-'.$section->id;
-                $sectionsConfig[$sectionIndex] = array('label' => $section->name, 'value' => $section->id);
+                $sectionsConfig[$sectionIndex] = array('default_index' => $env.'_section_'.$section->handle, 'label' => $section->name, 'handle' => $section->handle, 'value' => $section->id);
             }
         }
 
