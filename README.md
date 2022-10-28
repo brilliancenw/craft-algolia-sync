@@ -2,7 +2,7 @@
 
 Syncing elements with Algolia using their API
 
-![Screenshot](./docs/img/heading.png)
+![Screenshot](./docs/img/algolia-sync-banner.jpg)
 
 ## Requirements
 
