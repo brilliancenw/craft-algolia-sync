@@ -39,14 +39,14 @@ class Settings extends Model
      *
      * @var string
      */
-    public $algoliaAdmin        = ''; // ALGOLIA_ADMIN
-    public $algoliaApp          = ''; // ALGOLIA_APP
-    public $algoliaSearch       = ''; // ALGOLIA_SEARCH
-    public $algoliaSections     = [];
-    public $algoliaCategories   = [];
-    public $algoliaUserGroupList  = [];
-    public $algoliaLoadIndex    = [];
-    public $algoliaStopWord    = 'Algolia';
+    public string $algoliaAdmin         = ''; // ALGOLIA_ADMIN
+    public string $algoliaApp           = ''; // ALGOLIA_APP
+    public string $algoliaSearch        = ''; // ALGOLIA_SEARCH
+    public array $algoliaSections       = [];
+    public array $algoliaCategories     = [];
+    public array $algoliaUserGroupList  = [];
+    public array $algoliaLoadIndex      = [];
+    public string $algoliaStopWord      = 'Algolia';
 
     public function getAlgoliaAdmin(): string
     {
@@ -60,9 +60,8 @@ class Settings extends Model
     {
         return (Craft::parseEnv($this->algoliaSearch) ?? '');
     }
-    public function rules()
+    public function rules(): array
     {
-        return [
-        ];
+        return [];
     }
 }

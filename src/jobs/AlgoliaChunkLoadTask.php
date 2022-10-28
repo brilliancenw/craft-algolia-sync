@@ -59,14 +59,14 @@ class AlgoliaChunkLoadTask extends BaseJob
      *
      * @var string
      */
-    public $loadRecordType = [];
-    public $offset = 0;
-    public $limit = 100;
-    public $elementType = '';
+    public string|array $loadRecordType = [];
+    public int $offset = 0;
+    public int $limit = 100;
+    public string $elementType = '';
 
     // Public Methods
     // =========================================================================
-    
+
 
     /**
      * When the Queue is ready to run your job, it will call this method.
@@ -75,7 +75,7 @@ class AlgoliaChunkLoadTask extends BaseJob
      *
      * More info: https://github.com/yiisoft/yii2-queue
      */
-    public function execute($queue)
+    public function execute($queue): void
     {
         // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 

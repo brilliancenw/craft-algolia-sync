@@ -18,6 +18,8 @@ use craft\web\Controller;
 use craft\elements\Entry;
 
 use brilliance\algoliasync\jobs\AlgoliaBulkLoadTask;
+use craft\helpers\UrlHelper;
+
 
 /**
  * Default Controller
@@ -50,7 +52,7 @@ class DefaultController extends Controller
      *         The actions must be in 'kebab-case'
      * @access protected
      */
-    protected $allowAnonymous = [];
+    protected int|bool|array $allowAnonymous = [];
 
     // Public Methods
     // =========================================================================
@@ -61,20 +63,18 @@ class DefaultController extends Controller
      *
      * @return mixed
      */
-    public function actionIndex()
+    public function actionIndex(): mixed
     {
-
         $result = array();
-
         $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
         if (is_array($algoliaSettings['algoliaSections'])) {
             $result[] = '<h4>Entry Types</h4>';
             $result[] = '<ul>';
             foreach ($algoliaSettings['algoliaSections'] AS $typeId) {
-
                 $entryType = Craft::$app->sections->getSectionById($typeId);
-                $result[] = '<li><a href="/actions/algolia-sync/default/load-records?elementType=entry&elementTypeId='.$entryType->id.'">'.$entryType->name."</a>";
+
+                $result[] = '<li><a href="'.UrlHelper::actionUrl(('algolia-sync/default/load-records?elementType=entry&elementTypeId='.$entryType->id)).'">'.$entryType->name."</a>";
             }
             $result[] = '</ul>';
         }
@@ -83,7 +83,7 @@ class DefaultController extends Controller
             $result[] = '<ul>';
             foreach ($algoliaSettings['algoliaCategories'] AS $categoryGroup) {
                 $categoryGroup = Craft::$app->categories->getGroupById($categoryGroup);
-                $result[] = '<li><a href="/actions/algolia-sync/default/load-records?elementType=category&elementTypeId='.$categoryGroup->id.'">'.$categoryGroup->name."</a>";
+                $result[] = '<li><a href="'.UrlHelper::actionUrl(('algolia-sync/default/load-records?elementType=category&elementTypeId='.$categoryGroup->id)).'">'.$categoryGroup->name."</a>";
             }
             $result[] = '</ul>';
         }
@@ -93,7 +93,7 @@ class DefaultController extends Controller
             $result[] = '<ul>';
             foreach ($algoliaSettings['algoliaUserGroupList'] AS $userGroup) {
                 $memberGroups = Craft::$app->userGroups->getGroupById($userGroup);
-                $result[] = '<li><a href="/actions/algolia-sync/default/load-records?elementType=user&elementTypeId='.$memberGroups->id.'">'.$memberGroups->name."</a>";
+                $result[] = '<li><a href="'.UrlHelper::actionUrl(('actions/algolia-sync/default/load-records?elementType=user&elementTypeId='.$memberGroups->id)).'">'.$memberGroups->name."</a>";
             }
             $result[] = '</ul>';
         }
@@ -101,7 +101,6 @@ class DefaultController extends Controller
     }
 
     /**
-     * Handle a request going to our plugin's actionDoSomething URL,
      * e.g.: actions/algolia-sync/default/load-records
      *
      * @return mixed
@@ -122,6 +121,7 @@ class DefaultController extends Controller
             ]));
         }
 
+        // todo : fix the method return
         print "These Entities have been queued to sync with Algolia";
         exit;
 

@@ -39,16 +39,7 @@ use craft\events\ModelEvent;
 use yii\base\Event;
 
 /**
- * Craft plugins are very much like little applications in and of themselves. We’ve made
- * it as simple as we can, but the training wheels are off. A little prior knowledge is
- * going to be required to write a plugin.
- *
- * For the purposes of the plugin docs, we’re going to assume that you know PHP and SQL,
- * as well as some semi-advanced concepts like object-oriented programming and PHP namespaces.
- *
- * https://craftcms.com/docs/plugins/introduction
- *
- * @author    Mark Middleton
+ * @author    Brilliance Northwest LLC
  * @package   AlgoliaSync
  * @since     1.0.0
  *
@@ -80,7 +71,7 @@ class AlgoliaSync extends Plugin
      *
      * @var AlgoliaSync
      */
-    public static $plugin;
+    public static AlgoliaSync $plugin;
 
     // Public Properties
     // =========================================================================
@@ -90,7 +81,7 @@ class AlgoliaSync extends Plugin
      *
      * @var string
      */
-    public $schemaVersion = '1.0.1';
+    public string $schemaVersion = '1.0.1';
 
 
     // Public Methods
@@ -167,7 +158,6 @@ class AlgoliaSync extends Plugin
             }
         );
 
-        // Do something after we're installed
         Event::on(
             Plugins::class,
             Plugins::EVENT_AFTER_INSTALL_PLUGIN,
@@ -212,9 +202,6 @@ class AlgoliaSync extends Plugin
                 if (!in_array($thisEventId, $recursiveRecord)) {
                     $recursionLevel++;
                     $recursiveRecord[] = $thisEventId;
-
-                    $message = "USER - AFTER SAVE EVENT";
-                    Craft::info($message, 'Algolia-Sync');
 
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->sender, 'save');
                 }

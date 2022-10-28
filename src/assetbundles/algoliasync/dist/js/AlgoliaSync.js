@@ -29,8 +29,5 @@ $( document ).ready(function() {
                 alert(data); // show response from the php script.
             }
         });
-
-
     });
-
 });

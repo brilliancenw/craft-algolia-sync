@@ -35,15 +35,6 @@ use craft\helpers\Json;
  */
 class AlgoliaSyncField extends Field
 {
-    // Public Properties
-    // =========================================================================
-
-    /**
-     * Some attribute
-     *
-     * @var string
-     */
-    public $someAttribute = 'Some Default';
 
     // Static Methods
     // =========================================================================
@@ -55,7 +46,7 @@ class AlgoliaSyncField extends Field
      */
     public static function displayName(): string
     {
-        return Craft::t('algolia-sync', 'AlgoliaSyncField');
+        return Craft::t('algolia-sync', 'Algolia Sync Field');
     }
 
     // Public Methods
@@ -71,7 +62,7 @@ class AlgoliaSyncField extends Field
      *
      * @return array
      */
-    public function rules()
+    public function rules(): array
     {
         $rules = parent::rules();
         $rules = array_merge($rules, [
@@ -110,7 +101,7 @@ class AlgoliaSyncField extends Field
      *
      * @return mixed The prepared field value
      */
-    public function normalizeValue($value, ElementInterface $element = null)
+    public function normalizeValue($value, ElementInterface $element = null): mixed
     {
         return $value;
     }
@@ -128,7 +119,7 @@ class AlgoliaSyncField extends Field
      *
      * @return null|false `false` in the event that the method is sure that no elements are going to be found.
      */
-    public function serializeValue($value, ElementInterface $element = null)
+    public function serializeValue($value, ElementInterface $element = null): null|bool
     {
         return parent::serializeValue($value, $element);
     }
@@ -225,7 +216,7 @@ class AlgoliaSyncField extends Field
      *
      * @return string|null
      */
-    public function getSettingsHtml()
+    public function getSettingsHtml(): string|null
     {
         // Render the settings template
         return Craft::$app->getView()->renderTemplate(

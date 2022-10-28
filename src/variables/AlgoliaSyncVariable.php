@@ -42,7 +42,8 @@ class AlgoliaSyncVariable
      * @return string
      */
 
-    public function algoliaApiKey() {
+    public function algoliaApiKey(): string
+    {
 
         $isAdmin = Craft::$app->user->getIsAdmin();
         $globalAlgoliaAccess = Craft::$app->getUser()->getIdentity()->getFieldValue('globalAlgoliaAccess');

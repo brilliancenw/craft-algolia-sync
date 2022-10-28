@@ -44,17 +44,13 @@ class AlgoliaSyncService extends Component
     const EVENT_BEFORE_ALGOLIA_SYNC = 'beforeAlgoliaSyncEvent';
 
     /**
-     * This function can literally be anything you want, and you can have as many service
-     * functions as you want
+     *     AlgoliaSync::$plugin->algoliaSyncService->generateSecuredApiKey()
      *
-     * From any other plugin file, call it like this:
-     *
-     *     AlgoliaSync::$plugin->algoliaSyncService->exampleService()
-     *
-     * @return mixed
+     * @return string
      */
 
-    public function generateSecuredApiKey($filterCompany=null) {
+    public function generateSecuredApiKey($filterCompany=null): string
+    {
 
         $algoliaConfig = [];
 
@@ -70,12 +66,7 @@ class AlgoliaSyncService extends Component
             $algoliaConfig
         );
 
-        if (isset($public_key)) {
-            return $public_key;
-        }
-        else {
-            return '';
-        }
+        return $public_key ?? '';
     }
 
     public function updateAllElements($elementType, $sectionId) {
@@ -105,7 +96,8 @@ class AlgoliaSyncService extends Component
         }
     }
     // is this element one that is configured to be synced with Algolia?
-    public function algoliaElementSynced($element) {
+    public function algoliaElementSynced($element): bool
+    {
 
         $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
         $algoliaSettings = AlgoliaSync::$plugin->getSettings();
@@ -166,11 +158,7 @@ class AlgoliaSyncService extends Component
         $message .= print_r($recordUpdate['index'], true);
         $message .= print_r($recordUpdate, true);
 
-        $file = Craft::getAlias('@storage/logs/algoliasync.log');
-        $log = date('Y-m-d H:i:s').' '.$message."\n";
-        craft\helpers\FileHelper::writeToFile($file, $log, ['append' => true]);
-
-        Craft::warning($message, __METHOD__);
+        Craft::info($message, 'algolia-sync');
 
         $queue = Craft::$app->getQueue();
         $queue->push(new AlgoliaSyncTask([
@@ -185,13 +173,15 @@ class AlgoliaSyncService extends Component
 
     public function algoliaResetIndex($index) {
 
-        $queue = Craft::$app->getQueue();
-        $queue->push(new AlgoliaResetTask([
-            'algoliaIndex' => $index
-        ]));
+        // todo : flesh out the index reset
+//        $queue = Craft::$app->getQueue();
+//        $queue->push(new AlgoliaResetTask([
+//            'algoliaIndex' => $index
+//        ]));
 
     }
 
+    // todo : this was a poorly implemented solution to preventing specific field content from synced with Algolia.  Instead, implement a mechanism to choose specific fields to sync
     public function stopwordPass($fieldHandle, $stopword = '') {
         $stopword = trim($stopword);
         if ($stopword === '') {
@@ -213,34 +203,6 @@ class AlgoliaSyncService extends Component
         $fieldTypeArray = explode('\\', $fieldTypeLong);
         $fieldType = strtolower(array_pop($fieldTypeArray));
 
-        /*
-         *
-         * TODO - instead of the custom code for hooplarelated records...
-         * TODO - we should have an event that calls out with the field type
-         * TODO - and gets responses from other plugins
-         * TODO - This isn't harmful for now...
-         * TODO - just a bit cumbersome and adds code that won't apply to any other project
-         *
-         */
-
-        $file = Craft::getAlias('@storage/logs/algoliasync.log');
-        $log = date('Y-m-d H:i:s').' extracting info from this handle '.$fieldHandle.': '.$fieldType."\n";
-
-        craft\helpers\FileHelper::writeToFile($file, $log, ['append' => true]);
-        if ($fieldType == 'assets') {
-            // $dump = print_r($element->$fieldHandle->getOptions(), true);
-            $thisAsset = $element->$fieldHandle->one();
-
-            if ($thisAsset) {
-                $log = " ---------------------- ASSET ---------------------\n";
-                $log = $log . print_r($thisAsset->url, true)."\n";
-                $log = $log . " ---------------------- END ASSET ---------------------\n";
-                craft\helpers\FileHelper::writeToFile($file, $log, ['append' => true]);
-            }
-
-        }
-
-
         switch ($fieldType) {
             case 'plaintext':
                 $checkValue = $element->$fieldHandle;
@@ -248,7 +210,6 @@ class AlgoliaSyncService extends Component
                     return (float)$element->$fieldHandle;
                     }
                 return $element->$fieldHandle;
-                break;
             case 'categories':
                 $categories = $element->$fieldHandle->all();
                 $returnCats = [];
@@ -256,10 +217,7 @@ class AlgoliaSyncService extends Component
                     $returnCats[] = $cat->title;
                 }
                 return $returnCats;
-                break;
             case 'entries':
-
-                // we should add an ID field, as well as the title field
                 $allEntries = $element->$fieldHandle->all();
 
                 $titlesArray = [];
@@ -274,14 +232,10 @@ class AlgoliaSyncService extends Component
                     'ids'   => $idsArray,
                     'titles'    => $titlesArray
                 );
-
-                break;
             case 'number':
                     return (float)$element->$fieldHandle;
-                break;
             case 'lightswitch':
                     return (bool)$element->$fieldHandle;
-                break;
             case 'multiselect':
             case 'checkboxes':
                 $storedOptions = [];
@@ -294,10 +248,8 @@ class AlgoliaSyncService extends Component
                     }
                 }
                 return $storedOptions;
-                break;
             case 'dropdown':
                     return $element->$fieldHandle->label;
-                break;
             case 'date':
                 if ($element->$fieldHandle) {
                     return $element->$fieldHandle->getTimestamp();
@@ -305,7 +257,6 @@ class AlgoliaSyncService extends Component
                 else {
                     return null;
                 }
-                break;
             case 'assets':
                 $thisAsset = $element->$fieldHandle->one();
                 if ($thisAsset) {
@@ -314,16 +265,10 @@ class AlgoliaSyncService extends Component
                 else {
                     return null;
                 }
-                break;
             case 'mapfield':
-//                print "latitude:";
-//                print $element->$fieldHandle->lat;
-//                exit;
                 return null;
-                break;
-
         }
-        return '';
+        return null;
 
     }
 
@@ -393,6 +338,8 @@ class AlgoliaSyncService extends Component
                     $fieldTypeArray = explode('\\', $fieldTypeLong);
                     $fieldType = strtolower(array_pop($fieldTypeArray));
 
+                    // for the date field, create a few versions of the date
+                    // todo : add in a config for custom date format to be added
                     if ($fieldType == 'date') {
                         // get the friendly date
                         $friendlyName = $fieldName . "_friendly";
@@ -519,7 +466,8 @@ class AlgoliaSyncService extends Component
         return $info;
     }
 
-    public function getAlgoliaIndex($element) {
+    public function getAlgoliaIndex($element): array
+    {
         $returnIndex = [];
 
         if (getenv('ALGOLIA_INDEX_NAME') !== false) {

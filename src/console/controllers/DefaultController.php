@@ -48,44 +48,5 @@ class DefaultController extends Controller
     // Public Methods
     // =========================================================================
 
-    /**
-     * Handle algolia-sync/default console commands
-     *
-     * The first line of this method docblock is displayed as the description
-     * of the Console Command in ./craft help
-     *
-     * @return mixed
-     */
-    public function actionIndex()
-    {
-        $result = 'something';
 
-        echo "Welcome to the console DefaultController actionIndex() method\n";
-
-        return $result;
-    }
-
-    /**
-     * Handle algolia-sync/default/load-therapists console commands
-     *
-     * The first line of this method docblock is displayed as the description
-     * of the Console Command in ./craft help
-     *
-     * @return mixed
-     */
-    public function actionLoadTherapists()
-    {
-        $users = User::find()->group('allTherapists')->limit(10)->all();
-
-        foreach ($users as $user) {
-            print "username: ".$user->username."\n";
-            $photo = $user->profilePhoto->one();
-            if ($photo) {
-                print " --> profile photo:";
-                print $photo->url;
-                print "\n";
-                }
-            }
-        exit;
-    }
 }

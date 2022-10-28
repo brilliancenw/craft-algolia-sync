@@ -18,6 +18,7 @@ use craft\queue\BaseJob;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
+use yii\queue\RetryableJobInterface;
 
 /**
  * AlgoliaSyncTask job
@@ -48,8 +49,10 @@ use craft\elements\User;
  * @author    Mark Middleton
  * @package   AlgoliaSync
  * @since     1.0.0
+ *
+ * @property-read mixed $ttr
  */
-class AlgoliaBulkLoadTask extends BaseJob
+class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 {
     // Public Properties
     // =========================================================================
@@ -59,12 +62,28 @@ class AlgoliaBulkLoadTask extends BaseJob
      *
      * @var string
      */
-    public $loadRecordType = [];
-    public $standardLimit = 100;
+    public string|array $loadRecordType = [];
+    public int $standardLimit = 100;
 
     // Public Methods
     // =========================================================================
-    
+
+    /**
+     * @inheritDoc
+     */
+    public function getTtr()
+    {
+        return AlgoliaSync::$plugin->getSettings()->queueTtr ?? AlgoliaSync::getInstance()->queue->ttr;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function canRetry($attempt, $error): bool
+    {
+        $attempts = AlgoliaSync::$plugin->getSettings()->queueMaxRetry ?? AlgoliaSync::getInstance()->queue->attempts;
+        return $attempt < $attempts;
+    }
 
     /**
      * When the Queue is ready to run your job, it will call this method.
@@ -73,7 +92,7 @@ class AlgoliaBulkLoadTask extends BaseJob
      *
      * More info: https://github.com/yiisoft/yii2-queue
      */
-    public function execute($queue)
+    public function execute($queue): void
     {
         // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
@@ -90,26 +109,23 @@ class AlgoliaBulkLoadTask extends BaseJob
             CASE 'entry':
 
                 // loading too many causes a timeout and memory issue...
-                // what if we run some smaller loaders to execute a little block at a time?
-                // then we can run an infinite number!
+                // breaking these updates into 100 record chunks
 
                 $entryCount = Entry::find()->sectionId($sectionId)->count();
 
                 $queue = Craft::$app->getQueue();
 
                 for ($x=0; $x<$entryCount; $x=$x+$this->standardLimit) {
-                    print_r('count: '.$x);
-
-                        $jobId = $queue->push(new AlgoliaChunkLoadTask([
-                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
-                            'loadRecordType' => $this->loadRecordType,
-                            'limit' => 100,
-                            'offset' => $x,
-                            'elementType' => $elementType
-                        ]));
+                    $queue->push(new AlgoliaChunkLoadTask([
+                        'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
+                        'loadRecordType' => $this->loadRecordType,
+                        'limit' => 100,
+                        'offset' => $x,
+                        'elementType' => $elementType
+                    ]));
                 }
 
-                break;
+            break;
 
             CASE 'category':
 
@@ -118,13 +134,17 @@ class AlgoliaBulkLoadTask extends BaseJob
                 $categoryCount = count($categories);
 
                 $currentCategoryNumber = 0;
+
+                // this is probably a poor assumption to think that the quantity of categories
+                // won't time out (like entries or users)
+                // todo : break this into smaller chunks like entries and users
                 foreach ($categories AS $cat) {
                     $progress = $currentCategoryNumber / $categoryCount;
                     $this->setProgress($queue, $progress);
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($cat);
                     $currentCategoryNumber++;
                 }
-                break;
+            break;
 
             CASE 'user':
 
@@ -140,7 +160,7 @@ class AlgoliaBulkLoadTask extends BaseJob
 
                     $chunkEnd = $x + $this->standardLimit;
 
-                    $jobId = $queue->push(new AlgoliaChunkLoadTask([
+                    $queue->push(new AlgoliaChunkLoadTask([
                         'description' => Craft::t('algolia-sync', 'Queueing records '.$x.' through '.$chunkEnd.' of a total '.$userCount.' users'),
                         'loadRecordType' => $this->loadRecordType,
                         'limit' => $this->standardLimit,
@@ -148,7 +168,7 @@ class AlgoliaBulkLoadTask extends BaseJob
                         'elementType' => $elementType
                     ]));
                 }
-                break;
+            break;
         }
     }
 
@@ -163,6 +183,9 @@ class AlgoliaBulkLoadTask extends BaseJob
      */
     protected function defaultDescription(): string
     {
-        return Craft::t('algolia-sync', 'Algolia Sync Task Default Message');
+        return Craft::t('algolia-sync', 'Algolia Sync');
     }
+
+
+
 }

@@ -55,11 +55,11 @@ class AlgoliaSyncTask extends BaseJob
      *
      * @var string
      */
-    public $algoliaIndex = '';
-    public $algoliaFunction = ''; // delete or insert
-    public $algoliaObjectID = 0;
-    public $algoliaRecord = [];
-    public $algoliaMessage = 'Algolia Sync Task';
+    public array $algoliaIndex = [];
+    public string $algoliaFunction = ''; // delete or insert
+    public int $algoliaObjectID = 0;
+    public array $algoliaRecord = [];
+    public string $algoliaMessage = 'Algolia Sync Task';
 
     // Public Methods
     // =========================================================================
@@ -71,7 +71,7 @@ class AlgoliaSyncTask extends BaseJob
      *
      * More info: https://github.com/yiisoft/yii2-queue
      */
-    public function execute($queue)
+    public function execute($queue): void
     {
 
         $client = new \AlgoliaSearch\Client(AlgoliaSync::$plugin->settings->getAlgoliaApp(), AlgoliaSync::$plugin->settings->getAlgoliaAdmin());
@@ -79,9 +79,6 @@ class AlgoliaSyncTask extends BaseJob
         foreach ($this->algoliaIndex AS $index) {
 
             $this->description = $this->algoliaMessage;
-
-            $message = "[".__FILE__.": line ".__LINE__."] pushing data to algolia to ".$this->algoliaFunction." this record\n";
-            $message .= print_r($this->algoliaRecord, true);
 
             $clientIndex = $client->initIndex($index);
 
@@ -95,10 +92,7 @@ class AlgoliaSyncTask extends BaseJob
                     break;
             }
 
-            $message .= print_r($response, true);
-            $file = Craft::getAlias('@storage/logs/algoliasync.log');
-            $log = date('Y-m-d H:i:s').' '.$message."\n";
-            craft\helpers\FileHelper::writeToFile($file, $log, ['append' => true]);
+            // todo implement craft categorized logs
 
         }
     }
