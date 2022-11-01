@@ -289,9 +289,7 @@ class AlgoliaSync extends Plugin
 
         // all Channel Sections
         $sectionsConfig = array();
-        $rawSections = Craft::$app->getSections();
-        $allSections = $rawSections->getAllSections();
-
+        $allSections = Craft::$app->sections->getAllSections();
         foreach ($allSections as $section) {
             if ($section->type == 'channel') {
                 $sectionIndex = 'section-'.$section->id;
@@ -304,17 +302,53 @@ class AlgoliaSync extends Plugin
             }
         }
 
+        // all Asset Volumes
+        $volumes = Craft::$app->volumes->getAllVolumes();
+        $volumesConfig = [];
+        foreach ($volumes AS $volume) {
+            $volumesConfig[] = array(
+                'default_index' => $env.'_volume_'.$volume->handle,
+                'label' => $volume->name,
+                'handle' => $volume->handle,
+                'value' => $volume->id
+            );
+        }
+
         // all Category Groups
         $catGroups = Craft::$app->categories->getAllGroups();
-
         $categoriesConfig = [];
-
         foreach ($catGroups AS $group) {
             $categoriesConfig[] = array(
                 'default_index' => $env.'_category_'.$group->handle,
                 'label' => $group->name,
                 'handle' => $group->handle,
                 'value' => $group->id
+            );
+        }
+
+
+
+        // $tagGroupsConfig
+        $tagGroups = Craft::$app->tags->getAllTagGroups();
+        $tagGroupsConfig = [];
+        foreach ($tagGroups AS $tagGroup) {
+            $tagGroupsConfig[] = array(
+                'default_index' => $env.'_tag_'.$tagGroup->handle,
+                'label' => $tagGroup->name,
+                'handle' => $tagGroup->handle,
+                'value' => $tagGroup->id
+            );
+        }
+
+        // $globalSetsConfig
+        $globalSets = Craft::$app->globals->getAllSets();
+        $globalSetsConfig = [];
+        foreach ($globalSets AS $globalSet) {
+            $globalSetsConfig[] = array(
+                'default_index' => $env.'_global_'.$globalSet->handle,
+                'label' => $globalSet->name,
+                'handle' => $globalSet->handle,
+                'value' => $globalSet->id
             );
         }
 
@@ -331,32 +365,9 @@ class AlgoliaSync extends Plugin
             );
         }
 
-        // $tagGroupsConfig
-        $tagGroups = Craft::$app->tags->getAllTagGroups();
-        $tagGroupsConfig = [];
-        foreach ($tagGroups AS $tagGroup) {
-            $tagGroupsConfig[] = array(
-                'default_index' => $env.'_tag_'.$group->handle,
-                'label' => $group->name,
-                'handle' => $group->handle,
-                'value' => $group->id
-            );
-        }
-
-        // $globalSetsConfig
-        $globalSets = Craft::$app->globals->getAllSets();
-        $globalSetsConfig = [];
-        foreach ($globalSets AS $globalSet) {
-            $globalSetsConfig[] = array(
-                'default_index' => $env.'_global_'.$globalSet->handle,
-                'label' => $globalSet->name,
-                'handle' => $globalSet->handle,
-                'value' => $globalSet->id
-            );
-        }
-
         $supportedElements = [
             ['label' => 'Sections', 'handle' => 'section', 'data' => $sectionsConfig],
+            ['label' => 'Asset Volumes', 'handle' => 'volume', 'data' => $volumesConfig],
             ['label' => 'Categories', 'handle' => 'category', 'data' => $categoriesConfig],
             ['label' => 'Tag Groups', 'handle' => 'tagGroup', 'data' => $tagGroupsConfig],
             ['label' => 'Global Sets', 'handle' => 'globalSet', 'data' => $globalSetsConfig],
