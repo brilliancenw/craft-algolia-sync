@@ -285,43 +285,94 @@ class AlgoliaSync extends Plugin
     protected function settingsHtml(): string
     {
 
+        $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+
         // all Channel Sections
         $sectionsConfig = array();
         $rawSections = Craft::$app->getSections();
         $allSections = $rawSections->getAllSections();
-        $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
 
         foreach ($allSections as $section) {
             if ($section->type == 'channel') {
                 $sectionIndex = 'section-'.$section->id;
-                $sectionsConfig[$sectionIndex] = array('default_index' => $env.'_section_'.$section->handle, 'label' => $section->name, 'handle' => $section->handle, 'value' => $section->id);
+                $sectionsConfig[$sectionIndex] = array(
+                    'default_index' => $env.'_section_'.$section->handle,
+                    'label' => $section->name,
+                    'handle' => $section->handle,
+                    'value' => $section->id
+                );
             }
         }
 
         // all Category Groups
         $catGroups = Craft::$app->categories->getAllGroups();
 
-        $returnCatGroups = [];
+        $categoriesConfig = [];
 
         foreach ($catGroups AS $group) {
-            $returnCatGroups[] = array('label' => $group->name, 'value' => $group->id);
+            $categoriesConfig[] = array(
+                'default_index' => $env.'_category_'.$group->handle,
+                'label' => $group->name,
+                'handle' => $group->handle,
+                'value' => $group->id
+            );
         }
 
         // user groups list
         $userGroups = Craft::$app->userGroups->getAllGroups();
-        $usersConfig = [];
+        $userGroupsConfig = [];
 
         foreach ($userGroups AS $group) {
-            $usersConfig[] = array('label' => $group->name, 'value' => $group->id);
+            $userGroupsConfig[] = array(
+                'default_index' => $env.'_user_'.$group->handle,
+                'label' => $group->name,
+                'handle' => $group->handle,
+                'value' => $group->id
+            );
         }
+
+        // $tagGroupsConfig
+        $tagGroups = Craft::$app->tags->getAllTagGroups();
+        $tagGroupsConfig = [];
+        foreach ($tagGroups AS $tagGroup) {
+            $tagGroupsConfig[] = array(
+                'default_index' => $env.'_tag_'.$group->handle,
+                'label' => $group->name,
+                'handle' => $group->handle,
+                'value' => $group->id
+            );
+        }
+
+        // $globalSetsConfig
+        $globalSets = Craft::$app->globals->getAllSets();
+        $globalSetsConfig = [];
+        foreach ($globalSets AS $globalSet) {
+            $globalSetsConfig[] = array(
+                'default_index' => $env.'_global_'.$globalSet->handle,
+                'label' => $globalSet->name,
+                'handle' => $globalSet->handle,
+                'value' => $globalSet->id
+            );
+        }
+
+        $supportedElements = [
+            ['label' => 'Sections', 'handle' => 'section', 'data' => $sectionsConfig],
+            ['label' => 'Categories', 'handle' => 'category', 'data' => $categoriesConfig],
+            ['label' => 'Tag Groups', 'handle' => 'tagGroup', 'data' => $tagGroupsConfig],
+            ['label' => 'Global Sets', 'handle' => 'globalSet', 'data' => $globalSetsConfig],
+            ['label' => 'User Groups', 'handle' => 'userGroup', 'data' => $userGroupsConfig]
+        ];
+
+
 
         return Craft::$app->view->renderTemplate(
             'algolia-sync/settings',
             [
                 'settings' => $this->getSettings(),
                 'sectionsConfig' => $sectionsConfig,
-                'categoriesConfig' => $returnCatGroups,
-                'usersConfig' => $usersConfig
+                'categoriesConfig' => $categoriesConfig,
+                'usersConfig' => $userGroupsConfig,
+                'supportedElementsConfig' => $supportedElements
             ]
         );
     }

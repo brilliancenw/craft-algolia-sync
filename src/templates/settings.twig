@@ -17,77 +17,55 @@
 
 {% do view.registerAssetBundle("brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset") %}
 
-<h1>Sections</h1>
-{% if sectionsConfig | length > 0 %}
-<p>Which Sections to automatically sync with Algolia?</p>
-    <table class="data fullwidth fixed-layout" dir="ltr">
-        <tbody>
-        <tr>
-            <th>Include section in Sync?</th>
-            <th>Default Index Name</th>
-            <th>Override Index Name</th>
-        </tr>
-    {% for section in sectionsConfig %}
-        {% set indexKey = "section-"~section.value %}
+{% for supportedElementType in supportedElementsConfig %}
+    <h1>{{ supportedElementType.label }}</h1>
+    {% if supportedElementType.data | length > 0 %}
+        <p>Which {{ supportedElementType.label }} to automatically sync with Algolia?</p>
+        <table class="data fullwidth fixed-layout" dir="ltr">
+            <tbody>
             <tr>
-                <th class="light">{{ forms.checkboxField({
-                        name:       'algoliaSections['~section.value~']',
-                        value:      section.value,
-                        label:      section.label,
-                        checked:    section.value in settings.algoliaSections,
-                        disabled:   false
-                    }) }}</th>
-                <td>{{ section.default_index }}</td>
-                <td class="light">{{ forms.autosuggestField({
-                        name: "algoliaIndices["~indexKey~"]",
-                        value: settings['algoliaIndices']['section-'~section.value] ?? '',
-                        suggestEnvVars: true
-                    }) }}</td>
+                <th>Include in Sync?</th>
+                <th>Default Algolia Index Name</th>
+                <th>Override Default Algolia Index Name</th>
             </tr>
-    {% endfor %}
-        </tbody>
-    </table>
-{% else %}
-    <p>Your installation does not have any sections that can be configured to Sync</p>
-{% endif %}
 
-<h4>Categories</h4>
-{% if categoriesConfig | length > 0 %}
-<p>Which Category Sets to automatically sync with Algolia?</p>
-    {% for category in categoriesConfig %}
-        {{ forms.checkboxField({
-            name:       'algoliaCategories['~category.value~']',
-            value:      category.value,
-            label:      category.label,
-            checked:    category.value in settings.algoliaCategories,
-            disabled:   false
-        }) }}
-    {% endfor %}
-{% else %}
-    <p>Your installation does not have any Category Groups that can be configured to Sync</p>
-{% endif %}
+            {% for data in supportedElementType.data %}
+                {% set indexKey = supportedElementType.handle~"-"~data.value %}
+                <tr>
+                    <th class="light">
+                        {{ forms.checkboxField({
+                            name:       'algoliaElements['~indexKey~']',
+                            value:      indexKey,
+                            label:      data.label,
+                            checked:    indexKey in settings.algoliaElements,
+                            disabled:   false
+                        }) }}
+                    </th>
+                    <td><pre>{{ data.default_index | default('no default set') }}</pre></td>
+                    <td class="light">
+                        {{ forms.autosuggestField({
+                            name: "algoliaIndices["~indexKey~"]",
+                            value: settings['algoliaIndices'][indexKey] ?? '',
+                            suggestEnvVars: true
+                        }) }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        {% set editionName = craft.app.getEditionName() | lower %}
+        {% if supportedElementType.handle == 'userGroup' and editionName == 'solo' %}
+            <p>Your Craft CMS edition is "Solo" and does not support User Groups</p>
+        {% else %}
+            <p>Your installation does not have any {{ supportedElementType.label }} that can be configured to Sync with Algolia</p>
+        {% endif %}
+    {% endif %}
+{% endfor %}
 
-{% set editionName = craft.app.getEditionName() | lower %}
 
-<h4>User Groups</h4>
-{% if usersConfig | length > 0 %}
-<p>Which User Groups to sync to Algolia</p>
-    {% for userGroup in usersConfig %}
-        {{ forms.checkboxField({
-            name:       'algoliaUserGroupList['~userGroup.value~']',
-            value:      userGroup.value,
-            label:      userGroup.label,
-            checked:    userGroup.value in settings.algoliaUserGroupList,
-            disabled:   false
-        }) }}
-    {% endfor %}
-{% elseif editionName == 'solo' %}
-    <p>Your Craft CMS edition is "Solo" and does not support User Groups</p>
-{% else %}
-    <p>Your installation does not have any User Groups that can be configured to Sync</p>
-{% endif %}
-<br>
-
+<hr>
+<h1>Bulk Load of Records</h1>
 <a href="{{ cpUrl('utilities/algolia-sync-utility') }}">Visit the Utilities Page to Bulk Load Records</a>
 
 {{ forms.autosuggestField({
@@ -114,13 +92,4 @@
     suggestEnvVars: true
 }) }}
 
-<hr>
-
-{{ forms.autosuggestField({
-    label: 'Algolia Stop Word',
-    id: 'algoliaStopWord',
-    name: 'algoliaStopWord',
-    value: settings['algoliaStopWord'],
-    suggestEnvVars: true
-}) }}
 
