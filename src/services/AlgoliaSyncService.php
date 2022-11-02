@@ -38,6 +38,8 @@ use brilliance\algoliasync\jobs\AlgoliaSyncTask;
  * @author    Mark Middleton
  * @package   AlgoliaSync
  * @since     1.0.0
+ *
+ * @property-read array[] $algoliaSupportedElements
  */
 class AlgoliaSyncService extends Component
 {
@@ -72,6 +74,7 @@ class AlgoliaSyncService extends Component
         return $public_key ?? '';
     }
 
+
     public function updateAllElements($elementType, $sectionId) {
 
         SWITCH ($elementType) {
@@ -98,53 +101,29 @@ class AlgoliaSyncService extends Component
                 break;
         }
     }
+
+
     // is this element one that is configured to be synced with Algolia?
     public function algoliaElementSynced($element): bool
     {
-
         $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
         $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
         SWITCH ($elementInfo['type']) {
             CASE 'entry':
-                $entrySections = $elementInfo['sectionId'];
-                $syncedSections = $algoliaSettings['algoliaSections'];
-
-                if (!is_array($syncedSections)) {
-                    return false;
-                }
-                foreach ($entrySections AS $syncSection) {
-                    if (in_array($syncSection, $syncedSections)) {
-                        return true;
-                    }
-                }
-            break;
-
             CASE 'category':
-
-                $categoryGroups = $elementInfo['sectionId'];
-
-                if (is_array($algoliaSettings['algoliaCategories'])) {
-                    $syncedCategories = $algoliaSettings['algoliaCategories'];
+                if (isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync']) && $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1) {
+                    return true;
                 }
-                else {
-                    $syncedCategories = [];
-                }
-
-                foreach ($categoryGroups AS $groupId) {
-                    if (in_array($groupId, $syncedCategories)) {
-                        return true;
-                    }
-                }
-            break;
+            return false;
 
             CASE 'user':
-                $userGroups = $elementInfo['sectionId'];
-                $syncedGroups = $algoliaSettings['algoliaUserGroupList'];
+                if (count($elementInfo['sectionId']) > 0) {
+                    $userGroups = $elementInfo['sectionId'];
+                    $syncedGroups = $algoliaSettings['algoliaElements']['user'];
 
-                if (is_array($syncedGroups) AND count($syncedGroups) > 0) {
-                    foreach ($userGroups AS $groupId) {
-                        if (in_array($groupId, $syncedGroups)) {
+                    foreach ($userGroups AS $userGroup) {
+                        if (isset($syncedGroups[$userGroup]) && $syncedGroups[$userGroup]['sync'] == 1) {
                             return true;
                         }
                     }
@@ -282,7 +261,6 @@ class AlgoliaSyncService extends Component
         $recordUpdate = array();
 
         $algoliaSettings = AlgoliaSync::$plugin->getSettings();
-        $algoliaStopWord = $algoliaSettings['algoliaStopWord'];
 
         if (AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element)) {
 
@@ -320,8 +298,6 @@ class AlgoliaSyncService extends Component
 
                 $fieldHandle = $field->handle;
 
-                if ($algoliaStopWord === '' OR $this->stopwordPass($fieldHandle, $algoliaStopWord)) {
-
                     // send this off to a function to extract the specific information
                     // based on what type of field it is (asset, text, varchar, etc...)
 
@@ -355,7 +331,7 @@ class AlgoliaSyncService extends Component
                         $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
                         $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
                     }
-                }
+
             }
 
             $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
@@ -409,6 +385,7 @@ class AlgoliaSyncService extends Component
         $fieldName = preg_replace("/[^A-Za-z0-9 ]/", '', $fieldName);
         return str_replace(' ', '_', $fieldName);
     }
+
     public function getEventElementInfo($element, $processRecords = true) {
 
         $elementTypeSlugArray = explode("\\", get_class($element));
@@ -433,16 +410,17 @@ class AlgoliaSyncService extends Component
                 break;
             case 'user':
 
-                // this will get the current user's groups
+                // this will get the current user's groups (may be multiple indexes to update)
                 // lets only upsert records that match the configured groups in algolia sync
                 $algoliaSettings = AlgoliaSync::$plugin->getSettings();
-                $syncedGroups = $algoliaSettings['algoliaUserGroupList'];
+                $syncedGroups = $algoliaSettings['algoliaElements']['user'];
 
                 $userGroups = Craft::$app->userGroups->getGroupsByUserId($element->id);
                 $deleteFromAlgolia = true;
 
                 foreach ($userGroups AS $group) {
-                    if (in_array($group->id, $syncedGroups)) {
+
+                    if (isset($syncedGroups[$group->id]) && $syncedGroups[$group->id]['sync'] == 1) {
                         $info['sectionHandle'][] = $group->handle;
                         $info['sectionId'][] = $group->id;
                         $deleteFromAlgolia = false;
@@ -457,7 +435,7 @@ class AlgoliaSyncService extends Component
                 if ($deleteFromAlgolia && $processRecords) {
 
                     $elementData = [];
-                    $elementData['index'] = $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+                    $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
                     $elementData['attributes'] = [];
                     $elementData['attributes']['objectID'] = $element->id;
 
@@ -490,12 +468,12 @@ class AlgoliaSyncService extends Component
         $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
 
         // all Channel Sections
-        $sectionsConfig = array();
+        $entriesConfig = array();
         $allSections = Craft::$app->sections->getAllSections();
         foreach ($allSections as $section) {
             if ($section->type == 'channel') {
                 $sectionIndex = 'section-'.$section->id;
-                $sectionsConfig[$sectionIndex] = array(
+                $entriesConfig[$sectionIndex] = array(
                     'default_index' => $env.'_section_'.$section->handle,
                     'label' => $section->name,
                     'handle' => $section->handle,
@@ -565,12 +543,12 @@ class AlgoliaSyncService extends Component
         }
 
         return [
-            ['label' => 'Sections',         'handle' => 'section',          'data' => $sectionsConfig],
+            ['label' => 'Entries',          'handle' => 'entry',            'data' => $entriesConfig],
             ['label' => 'Asset Volumes',    'handle' => 'volume',           'data' => $volumesConfig],
-            ['label' => 'Categories',       'handle' => 'categoryGroup',    'data' => $categoriesConfig],
-            ['label' => 'Tag Groups',       'handle' => 'tagGroup',         'data' => $tagGroupsConfig],
+            ['label' => 'Categories',       'handle' => 'category',         'data' => $categoriesConfig],
+//            ['label' => 'Tag Groups',       'handle' => 'tagGroup',         'data' => $tagGroupsConfig],
             ['label' => 'Global Sets',      'handle' => 'globalSet',        'data' => $globalSetsConfig],
-            ['label' => 'User Groups',      'handle' => 'userGroup',        'data' => $userGroupsConfig]
+            ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig]
         ];
     }
 }

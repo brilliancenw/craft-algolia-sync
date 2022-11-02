@@ -14,6 +14,7 @@ use brilliance\algoliasync\AlgoliaSync;
 
 use Craft;
 use craft\base\Model;
+use craft\helpers\App;
 
 /**
  * AlgoliaSync Settings Model
@@ -39,22 +40,22 @@ class Settings extends Model
      *
      * @var string
      */
-    public string $algoliaAdmin         = ''; // ALGOLIA_ADMIN
-    public string $algoliaApp           = ''; // ALGOLIA_APP
-    public string $algoliaSearch        = ''; // ALGOLIA_SEARCH
+    public string $algoliaAdmin = ''; // ALGOLIA_ADMIN
+    public string $algoliaApp = '';              // ALGOLIA_APP
+    public string $algoliaSearch = ''; // ALGOLIA_SEARCH
     public array $algoliaElements     = []; // sections, categories, usergroups, etc...
 
     public function getAlgoliaAdmin(): string
     {
-        return (getenv($this->algoliaAdmin) ?? '');
+        return App::parseEnv($this->algoliaAdmin);
     }
     public function getAlgoliaApp(): string
     {
-        return (getenv($this->algoliaApp) ?? '');
+        return App::parseEnv($this->algoliaApp);
     }
     public function getAlgoliaSearch(): string
     {
-        return (getenv($this->algoliaSearch) ?? '');
+        return App::parseEnv($this->algoliaSearch);
     }
     public function rules(): array
     {

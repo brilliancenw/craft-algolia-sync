@@ -19,6 +19,7 @@ use brilliance\algoliasync\utilities\AlgoliaSyncUtility as AlgoliaSyncUtilityUti
 
 use Craft;
 use craft\base\Plugin;
+use craft\behaviors\EnvAttributeParserBehavior;
 use craft\helpers\App;
 use craft\helpers\ElementHelper;
 use craft\services\Plugins;
@@ -195,6 +196,8 @@ class AlgoliaSync extends Plugin
             User::EVENT_AFTER_SAVE,
             function (ModelEvent $event) {
 
+
+
                 $thisEventId = (int)$event->sender->id;
 
                 static $recursionLevel = 0;
@@ -229,7 +232,6 @@ class AlgoliaSync extends Plugin
                 if (!in_array($thisEventId, $recursiveRecord)) {
                     $recursionLevel++;
                     $recursiveRecord[] = $thisEventId;
-
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->element, 'save');
                 }
 
@@ -241,12 +243,14 @@ class AlgoliaSync extends Plugin
             Users::EVENT_AFTER_ASSIGN_USER_TO_GROUPS,
 
             function ($event) {
-
                 $user = User::find()->id($event->userId)->one();
 
                 if ($user) {
+
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user, 'save');
                 }
+
+
 
                 return $event;
             });
@@ -274,6 +278,17 @@ class AlgoliaSync extends Plugin
     {
         return new Settings();
     }
+
+    protected function defineBehaviors(): array
+    {
+        return [
+            'parser' => [
+                'class' => EnvAttributeParserBehavior::class,
+                'attributes' => ['algoliaApp','algoliaSearch','algoliaAdmin'],
+            ],
+        ];
+    }
+
 
     /**
      * Returns the rendered settings HTML, which will be inserted into the content

@@ -12,9 +12,6 @@ namespace brilliance\algoliasync\utilities;
 
 use brilliance\algoliasync\AlgoliaSync;
 
-use brilliance\algoliasync\models\Settings;
-use brilliance\algoliasync\assetbundles\AlgoliaSync\AlgoliaSyncAsset;
-
 use Craft;
 use craft\base\Utility;
 
@@ -87,9 +84,7 @@ class AlgoliaSyncUtility extends Utility
      */
     public static function contentHtml(): string
     {
-
         $supportedElements = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaSupportedElements();
-
         return Craft::$app->view->renderTemplate(
             'algolia-sync/_components/utilities/AlgoliaSyncUtility_content',
             [
@@ -97,7 +92,5 @@ class AlgoliaSyncUtility extends Utility
                 'supportedElementsConfig' => $supportedElements
             ]
         );
-
-
     }
 }

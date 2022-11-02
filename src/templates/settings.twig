@@ -71,7 +71,8 @@
     id: 'algoliaApp',
     name: 'algoliaApp',
     value: settings['algoliaApp'],
-    suggestEnvVars: true
+    suggestEnvVars: true,
+    suggestions: craft.cp.getEnvSuggestions(),
 }) }}
 
 {{ forms.autosuggestField({
