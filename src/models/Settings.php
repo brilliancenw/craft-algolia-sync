@@ -44,8 +44,6 @@ class Settings extends Model
     public string $algoliaSearch        = ''; // ALGOLIA_SEARCH
     public array $algoliaElements     = []; // sections, categories, usergroups, etc...
 
-    public array $algoliaIndices        = [];
-
     public function getAlgoliaAdmin(): string
     {
         return (getenv($this->algoliaAdmin) ?? '');

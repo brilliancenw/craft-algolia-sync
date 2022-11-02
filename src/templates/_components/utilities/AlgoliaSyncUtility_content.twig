@@ -12,17 +12,21 @@
 <a href="{{ cpUrl('settings/plugins/algolia-sync') }}">Visit the Settings Page to Choose Which Element Types are Configured to Be Loaded into Algolia</a>
 <form action="{{ actionUrl('algolia-sync/default/load-records') }}" method="post" id="algoliaSyncLoad">
     {{ csrfInput() }}
-    <pre>
-    {{ dump(algoliaSettings) }}
-        </pre>
-{#    {%  for storageType,elementList in utilityData %}#}
-{#    <h3>{{ storageType }}</h3>#}
-{#        <ul>#}
-{#        {%  for item in elementList %}#}
-{#            <li><input type="checkbox" class='algoliaLoadCheckbox' name="loadRecords[]" value="{{ item.type }}|{{ item.id }}" /> Send all {{ item.name }} to sync with Algolia</li>#}
-{#        {%  endfor %}#}
-{#        </ul>#}
-{#    {% endfor %}#}
+    {% for elementType in supportedElementsConfig %}
+            <h3>{{ elementType.label }}</h3>
+                <ul>
+                    {% set elementTypeSync = false %}
+                {%  for item in elementType.data %}
+                    {% if settings['algoliaElements'][elementType.handle][item.value]['sync'] is defined and settings['algoliaElements'][elementType.handle][item.value]['sync'] == '1' %}
+                        <li><input type="checkbox" class='algoliaLoadCheckbox' name="loadRecords[]" value="{{ elementType.handle }}|{{ item.value }}" /> Send all {{ item.label }} to sync with Algolia</li>
+                        {% set elementTypeSync = true %}
+                    {% endif %}
+                {%  endfor %}
+                {% if elementTypeSync == false %}
+                    <li>There are no {{ elementType.label }} <a href="{{ cpUrl('settings/plugins/algolia-sync') }}">configured to sync</a></li>
+                {% endif %}
+                </ul>
+    {% endfor %}
     <p>&nbsp;</p>
     <input type="submit" class="btn submit" value="Bulk Load Records" />
 </form>

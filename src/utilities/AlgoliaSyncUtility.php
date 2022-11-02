@@ -10,7 +10,7 @@
 
 namespace brilliance\algoliasync\utilities;
 
-use brilliance\algoliasync;
+use brilliance\algoliasync\AlgoliaSync;
 
 use brilliance\algoliasync\models\Settings;
 use brilliance\algoliasync\assetbundles\AlgoliaSync\AlgoliaSyncAsset;
@@ -87,51 +87,17 @@ class AlgoliaSyncUtility extends Utility
      */
     public static function contentHtml(): string
     {
-        $utilityData = array();
 
-        $algoliaSettings = algoliasync\AlgoliaSync::$plugin->getSettings();
+        $supportedElements = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaSupportedElements();
 
-
-//        if (is_array($algoliaSettings['algoliaSections'])) {
-//
-//            foreach ($algoliaSettings['algoliaSections'] AS $typeId) {
-//
-//                $entryType = Craft::$app->sections->getSectionById($typeId);
-//
-//                if (isset($entryType->id)) {
-//                    $utilityData['Entry Types'][] = array(
-//                        'id' => $entryType->id,
-//                        'type' => 'entry',
-//                        'name' => $entryType->name);
-//                }
-//            }
-//        }
-//        if (is_array($algoliaSettings['algoliaCategories'])) {
-//            foreach ($algoliaSettings['algoliaCategories'] AS $categoryGroup) {
-//                $categoryGroup = Craft::$app->categories->getGroupById($categoryGroup);
-//                $utilityData['Categories'][] = array(
-//                    'id' => $categoryGroup->id,
-//                    'type' => 'category',
-//                    'name' => $categoryGroup->name);
-//            }
-//        }
-//
-//        if (is_array($algoliaSettings['algoliaUserGroupList'])) {
-//
-//            foreach ($algoliaSettings['algoliaUserGroupList'] AS $userGroup) {
-//                $memberGroups = Craft::$app->userGroups->getGroupById($userGroup);
-//                $utilityData['Member Groups'][] = array(
-//                    'id' => $memberGroups->id,
-//                    'type' => 'user',
-//                    'name' => $memberGroups->name);
-//            }
-//        }
-
-        return Craft::$app->getView()->renderTemplate(
+        return Craft::$app->view->renderTemplate(
             'algolia-sync/_components/utilities/AlgoliaSyncUtility_content',
             [
-                'algoliaSettings' => $algoliaSettings
+                'settings' => AlgoliaSync::$plugin->getSettings(),
+                'supportedElementsConfig' => $supportedElements
             ]
         );
+
+
     }
 }

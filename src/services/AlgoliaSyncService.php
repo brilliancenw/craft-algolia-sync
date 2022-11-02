@@ -484,4 +484,93 @@ class AlgoliaSyncService extends Component
 
         return $returnIndex;
     }
+
+    // AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaSupportedElements()
+    public function getAlgoliaSupportedElements(): array {
+        $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+
+        // all Channel Sections
+        $sectionsConfig = array();
+        $allSections = Craft::$app->sections->getAllSections();
+        foreach ($allSections as $section) {
+            if ($section->type == 'channel') {
+                $sectionIndex = 'section-'.$section->id;
+                $sectionsConfig[$sectionIndex] = array(
+                    'default_index' => $env.'_section_'.$section->handle,
+                    'label' => $section->name,
+                    'handle' => $section->handle,
+                    'value' => $section->id
+                );
+            }
+        }
+
+        // all Asset Volumes
+        $volumes = Craft::$app->volumes->getAllVolumes();
+        $volumesConfig = [];
+        foreach ($volumes AS $volume) {
+            $volumesConfig[] = array(
+                'default_index' => $env.'_volume_'.$volume->handle,
+                'label' => $volume->name,
+                'handle' => $volume->handle,
+                'value' => $volume->id
+            );
+        }
+
+        // all Category Groups
+        $catGroups = Craft::$app->categories->getAllGroups();
+        $categoriesConfig = [];
+        foreach ($catGroups AS $group) {
+            $categoriesConfig[] = array(
+                'default_index' => $env.'_category_'.$group->handle,
+                'label' => $group->name,
+                'handle' => $group->handle,
+                'value' => $group->id
+            );
+        }
+
+        // $tagGroupsConfig
+        $tagGroups = Craft::$app->tags->getAllTagGroups();
+        $tagGroupsConfig = [];
+        foreach ($tagGroups AS $tagGroup) {
+            $tagGroupsConfig[] = array(
+                'default_index' => $env.'_tag_'.$tagGroup->handle,
+                'label' => $tagGroup->name,
+                'handle' => $tagGroup->handle,
+                'value' => $tagGroup->id
+            );
+        }
+
+        // $globalSetsConfig
+        $globalSets = Craft::$app->globals->getAllSets();
+        $globalSetsConfig = [];
+        foreach ($globalSets AS $globalSet) {
+            $globalSetsConfig[] = array(
+                'default_index' => $env.'_global_'.$globalSet->handle,
+                'label' => $globalSet->name,
+                'handle' => $globalSet->handle,
+                'value' => $globalSet->id
+            );
+        }
+
+        // user groups list
+        $userGroups = Craft::$app->userGroups->getAllGroups();
+        $userGroupsConfig = [];
+        foreach ($userGroups AS $group) {
+            $userGroupsConfig[] = array(
+                'default_index' => $env.'_user_'.$group->handle,
+                'label' => $group->name,
+                'handle' => $group->handle,
+                'value' => $group->id
+            );
+        }
+
+        return [
+            ['label' => 'Sections',         'handle' => 'section',          'data' => $sectionsConfig],
+            ['label' => 'Asset Volumes',    'handle' => 'volume',           'data' => $volumesConfig],
+            ['label' => 'Categories',       'handle' => 'categoryGroup',    'data' => $categoriesConfig],
+            ['label' => 'Tag Groups',       'handle' => 'tagGroup',         'data' => $tagGroupsConfig],
+            ['label' => 'Global Sets',      'handle' => 'globalSet',        'data' => $globalSetsConfig],
+            ['label' => 'User Groups',      'handle' => 'userGroup',        'data' => $userGroupsConfig]
+        ];
+    }
 }
