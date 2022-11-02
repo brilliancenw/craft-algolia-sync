@@ -17,6 +17,8 @@
 
 {% do view.registerAssetBundle("brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset") %}
 
+<h1>What Element Types to Sync with Algolia?</h1>
+
 {% for supportedElementType in supportedElementsConfig %}
     <h1>{{ supportedElementType.label }}</h1>
     {% if supportedElementType.data | length > 0 %}
@@ -28,24 +30,20 @@
                 <th>Default Algolia Index Name</th>
                 <th>Override Default Algolia Index Name</th>
             </tr>
-
             {% for data in supportedElementType.data %}
-                {% set indexKey = supportedElementType.handle~"-"~data.value %}
                 <tr>
                     <th class="light">
-                        {{ forms.checkboxField({
-                            name:       'algoliaElements['~indexKey~']',
-                            value:      indexKey,
-                            label:      data.label,
-                            checked:    indexKey in settings.algoliaElements,
-                            disabled:   false
+                        {{ forms.lightswitchField({
+                            label: data.label,
+                            name: "algoliaElements["~supportedElementType.handle~"]["~data.value~"][sync]",
+                            on: settings.algoliaElements[supportedElementType.handle][data.value]['sync'] ?? false,
                         }) }}
                     </th>
-                    <td><pre>{{ data.default_index | default('no default set') }}</pre></td>
+                    <td><pre>{{ data.default_index | default('no default available') }}</pre></td>
                     <td class="light">
                         {{ forms.autosuggestField({
-                            name: "algoliaIndices["~indexKey~"]",
-                            value: settings['algoliaIndices'][indexKey] ?? '',
+                            name: "algoliaElements["~supportedElementType.handle~"]["~data.value~"][customIndex]",
+                            value: settings.algoliaElements[supportedElementType.handle][data.value]['customIndex'] ?? '',
                             suggestEnvVars: true
                         }) }}
                     </td>

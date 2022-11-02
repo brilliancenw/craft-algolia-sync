@@ -326,8 +326,6 @@ class AlgoliaSync extends Plugin
             );
         }
 
-
-
         // $tagGroupsConfig
         $tagGroups = Craft::$app->tags->getAllTagGroups();
         $tagGroupsConfig = [];
@@ -355,7 +353,6 @@ class AlgoliaSync extends Plugin
         // user groups list
         $userGroups = Craft::$app->userGroups->getAllGroups();
         $userGroupsConfig = [];
-
         foreach ($userGroups AS $group) {
             $userGroupsConfig[] = array(
                 'default_index' => $env.'_user_'.$group->handle,
@@ -366,23 +363,18 @@ class AlgoliaSync extends Plugin
         }
 
         $supportedElements = [
-            ['label' => 'Sections', 'handle' => 'section', 'data' => $sectionsConfig],
-            ['label' => 'Asset Volumes', 'handle' => 'volume', 'data' => $volumesConfig],
-            ['label' => 'Categories', 'handle' => 'category', 'data' => $categoriesConfig],
-            ['label' => 'Tag Groups', 'handle' => 'tagGroup', 'data' => $tagGroupsConfig],
-            ['label' => 'Global Sets', 'handle' => 'globalSet', 'data' => $globalSetsConfig],
-            ['label' => 'User Groups', 'handle' => 'userGroup', 'data' => $userGroupsConfig]
+            ['label' => 'Sections',         'handle' => 'section',          'data' => $sectionsConfig],
+            ['label' => 'Asset Volumes',    'handle' => 'volume',           'data' => $volumesConfig],
+            ['label' => 'Categories',       'handle' => 'categoryGroup',    'data' => $categoriesConfig],
+            ['label' => 'Tag Groups',       'handle' => 'tagGroup',         'data' => $tagGroupsConfig],
+            ['label' => 'Global Sets',      'handle' => 'globalSet',        'data' => $globalSetsConfig],
+            ['label' => 'User Groups',      'handle' => 'userGroup',        'data' => $userGroupsConfig]
         ];
-
-
 
         return Craft::$app->view->renderTemplate(
             'algolia-sync/settings',
             [
                 'settings' => $this->getSettings(),
-                'sectionsConfig' => $sectionsConfig,
-                'categoriesConfig' => $categoriesConfig,
-                'usersConfig' => $userGroupsConfig,
                 'supportedElementsConfig' => $supportedElements
             ]
         );

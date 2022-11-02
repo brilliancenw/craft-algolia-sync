@@ -91,45 +91,46 @@ class AlgoliaSyncUtility extends Utility
 
         $algoliaSettings = algoliasync\AlgoliaSync::$plugin->getSettings();
 
-        if (is_array($algoliaSettings['algoliaSections'])) {
 
-            foreach ($algoliaSettings['algoliaSections'] AS $typeId) {
-
-                $entryType = Craft::$app->sections->getSectionById($typeId);
-
-                if (isset($entryType->id)) {
-                    $utilityData['Entry Types'][] = array(
-                        'id' => $entryType->id,
-                        'type' => 'entry',
-                        'name' => $entryType->name);
-                }
-            }
-        }
-        if (is_array($algoliaSettings['algoliaCategories'])) {
-            foreach ($algoliaSettings['algoliaCategories'] AS $categoryGroup) {
-                $categoryGroup = Craft::$app->categories->getGroupById($categoryGroup);
-                $utilityData['Categories'][] = array(
-                    'id' => $categoryGroup->id,
-                    'type' => 'category',
-                    'name' => $categoryGroup->name);
-            }
-        }
-
-        if (is_array($algoliaSettings['algoliaUserGroupList'])) {
-
-            foreach ($algoliaSettings['algoliaUserGroupList'] AS $userGroup) {
-                $memberGroups = Craft::$app->userGroups->getGroupById($userGroup);
-                $utilityData['Member Groups'][] = array(
-                    'id' => $memberGroups->id,
-                    'type' => 'user',
-                    'name' => $memberGroups->name);
-            }
-        }
+//        if (is_array($algoliaSettings['algoliaSections'])) {
+//
+//            foreach ($algoliaSettings['algoliaSections'] AS $typeId) {
+//
+//                $entryType = Craft::$app->sections->getSectionById($typeId);
+//
+//                if (isset($entryType->id)) {
+//                    $utilityData['Entry Types'][] = array(
+//                        'id' => $entryType->id,
+//                        'type' => 'entry',
+//                        'name' => $entryType->name);
+//                }
+//            }
+//        }
+//        if (is_array($algoliaSettings['algoliaCategories'])) {
+//            foreach ($algoliaSettings['algoliaCategories'] AS $categoryGroup) {
+//                $categoryGroup = Craft::$app->categories->getGroupById($categoryGroup);
+//                $utilityData['Categories'][] = array(
+//                    'id' => $categoryGroup->id,
+//                    'type' => 'category',
+//                    'name' => $categoryGroup->name);
+//            }
+//        }
+//
+//        if (is_array($algoliaSettings['algoliaUserGroupList'])) {
+//
+//            foreach ($algoliaSettings['algoliaUserGroupList'] AS $userGroup) {
+//                $memberGroups = Craft::$app->userGroups->getGroupById($userGroup);
+//                $utilityData['Member Groups'][] = array(
+//                    'id' => $memberGroups->id,
+//                    'type' => 'user',
+//                    'name' => $memberGroups->name);
+//            }
+//        }
 
         return Craft::$app->getView()->renderTemplate(
             'algolia-sync/_components/utilities/AlgoliaSyncUtility_content',
             [
-                'utilityData' => $utilityData
+                'algoliaSettings' => $algoliaSettings
             ]
         );
     }
