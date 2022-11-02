@@ -41,11 +41,7 @@ class DefaultController extends Controller
      */
     public function actionIndex()
     {
-        $result = AlgoliaSync::$plugin->settings->getAlgoliaApp();
-
-        echo "app key: ".$result."\n";
-
-        return $result;
+        
     }
 
 
