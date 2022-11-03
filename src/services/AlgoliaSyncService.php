@@ -14,6 +14,7 @@ use brilliance\algoliasync\AlgoliaSync;
 
 use Craft;
 use craft\elements\Asset;
+use craft\elements\Tag;
 use craft\helpers\App;
 use craft\base\Component;
 use craft\elements\Entry;
@@ -103,6 +104,15 @@ class AlgoliaSyncService extends Component
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user);
                 }
                 break;
+
+            CASE 'tag':
+                $allTags = Tag::find()->groupId($sectionId)->all();
+                foreach ($allTags AS $tag) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($tag);
+                }
+                break;
+
+
         }
     }
 
@@ -169,7 +179,8 @@ class AlgoliaSyncService extends Component
 
     }
 
-    // todo : this was a poorly implemented solution to preventing specific field content from synced with Algolia.  Instead, implement a mechanism to choose specific fields to sync
+    // todo : this was a poorly implemented solution to preventing specific field content from synced with Algolia.
+    //  Instead, implement a mechanism to choose specific fields to sync (or not to sync)
     public function stopwordPass($fieldHandle, $stopword = '') {
         $stopword = trim($stopword);
         if ($stopword === '') {
@@ -184,7 +195,8 @@ class AlgoliaSyncService extends Component
         return true;
     }
 
-    public function getFieldData($element, $field, $fieldHandle) {
+    public function getFieldData($element, $field, $fieldHandle): float|bool|array|null
+    {
 
         $fieldTypeLong = get_class($field);
         $fieldTypeArray = explode('\\', $fieldTypeLong);
@@ -302,9 +314,7 @@ class AlgoliaSyncService extends Component
 
                 // send this off to a function to extract the specific information
                 // based on what type of field it is (asset, text, varchar, etc...)
-
                 $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
-
                 $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
 
                 if (isset($rawData['type']) && $rawData['type'] == 'entries') {
@@ -333,7 +343,6 @@ class AlgoliaSyncService extends Component
                     $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
                     $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
                 }
-
             }
 
             $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
@@ -344,6 +353,8 @@ class AlgoliaSyncService extends Component
             switch ($elementTypeSlug) {
                 case 'category':
                 case 'entry':
+                case 'asset':
+                case 'tag':
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
@@ -406,6 +417,12 @@ class AlgoliaSyncService extends Component
             case 'entry':
                 if (!empty($element->sectionId)) {
                     $info['sectionHandle'][] = Craft::$app->sections->getSectionById($element->sectionId)->handle;
+                    $info['sectionId'][] = $element->sectionId;
+                }
+                break;
+            case 'tag':
+                if (!empty($element->sectionId)) {
+                    $info['sectionHandle'][] = Craft::$app->tags->getTagGroupById($element->sectionId)->handle;
                     $info['sectionId'][] = $element->sectionId;
                 }
                 break;
@@ -515,17 +532,21 @@ class AlgoliaSyncService extends Component
             );
         }
 
-        // $globalSetsConfig
-        $globalSets = Craft::$app->globals->getAllSets();
-        $globalSetsConfig = [];
-        foreach ($globalSets AS $globalSet) {
-            $globalSetsConfig[] = array(
-                'default_index' => $env.'_global_'.$globalSet->handle,
-                'label' => $globalSet->name,
-                'handle' => $globalSet->handle,
-                'value' => $globalSet->id
-            );
-        }
+        // We are not supporting Global Sets until I find a use case that I can build towards
+        // this would only create a single record in Algolia, which defeats the whole point of search
+        // please let us know if you have a specific use case and we can add in support to meet the need
+
+//        // $globalSetsConfig
+//        $globalSets = Craft::$app->globals->getAllSets();
+//        $globalSetsConfig = [];
+//        foreach ($globalSets AS $globalSet) {
+//            $globalSetsConfig[] = array(
+//                'default_index' => $env.'_global_'.$globalSet->handle,
+//                'label' => $globalSet->name,
+//                'handle' => $globalSet->handle,
+//                'value' => $globalSet->id
+//            );
+//        }
 
         // user groups list
         $userGroups = Craft::$app->userGroups->getAllGroups();
@@ -543,7 +564,8 @@ class AlgoliaSyncService extends Component
             ['label' => 'Entries',          'handle' => 'entry',            'data' => $entriesConfig],
             ['label' => 'Asset Volumes',    'handle' => 'asset',            'data' => $volumesConfig],
             ['label' => 'Categories',       'handle' => 'category',         'data' => $categoriesConfig],
-            ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig]
+            ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig],
+            ['label' => 'Tag Groups',       'handle' => 'tag',              'data' => $tagGroupsConfig]
         ];
     }
 }
