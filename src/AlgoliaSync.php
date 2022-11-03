@@ -220,6 +220,8 @@ class AlgoliaSync extends Plugin
 
             function ($event) {
 
+                // the User record is only recorded when it's related to a user group
+                // this is covered in the Users::EVENT_AFTER_ASSIGN_USER_TO_GROUPS event
                 if ($event->element instanceof craft\elements\User || ElementHelper::isDraftOrRevision($event->element)) {
                     return $event;
                 }
@@ -246,12 +248,8 @@ class AlgoliaSync extends Plugin
                 $user = User::find()->id($event->userId)->one();
 
                 if ($user) {
-
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user, 'save');
                 }
-
-
-
                 return $event;
             });
 

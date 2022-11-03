@@ -13,6 +13,7 @@ namespace brilliance\algoliasync\services;
 use brilliance\algoliasync\AlgoliaSync;
 
 use Craft;
+use craft\elements\Asset;
 use craft\helpers\App;
 use craft\base\Component;
 use craft\elements\Entry;
@@ -56,11 +57,8 @@ class AlgoliaSyncService extends Component
 
     public function generateSecuredApiKey($filterCompany=null): string
     {
-
         $algoliaConfig = [];
-
         $validUntil = time() + (60 * 60 * 24);
-
         $algoliaConfig['validUntil'] = $validUntil;
 
         if (isset($filterCompany) && $filterCompany > 0) {
@@ -86,10 +84,16 @@ class AlgoliaSyncService extends Component
                 break;
 
             CASE 'category':
-
                 $categories = Category::find()->groupId($sectionId)->all();
-                foreach ($categories AS $cat) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($cat);
+                foreach ($categories AS $category) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($category);
+                }
+                break;
+
+            CASE 'asset':
+                $assets = Asset::find()->volume($sectionId)->all();
+                foreach ($assets AS $asset) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($asset);
                 }
                 break;
 
@@ -112,12 +116,14 @@ class AlgoliaSyncService extends Component
         SWITCH ($elementInfo['type']) {
             CASE 'entry':
             CASE 'category':
+            CASE 'asset':
                 if (isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync']) && $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1) {
                     return true;
                 }
             return false;
 
             CASE 'user':
+
                 if (count($elementInfo['sectionId']) > 0) {
                     $userGroups = $elementInfo['sectionId'];
                     $syncedGroups = $algoliaSettings['algoliaElements']['user'];
@@ -141,7 +147,6 @@ class AlgoliaSyncService extends Component
         $message .= print_r($recordUpdate, true);
 
         Craft::info($message, 'algolia-sync');
-
 
         $queue = Craft::$app->getQueue();
         $queue->push(new AlgoliaSyncTask([
@@ -180,7 +185,6 @@ class AlgoliaSyncService extends Component
     }
 
     public function getFieldData($element, $field, $fieldHandle) {
-        // $event->element
 
         $fieldTypeLong = get_class($field);
         $fieldTypeArray = explode('\\', $fieldTypeLong);
@@ -260,8 +264,6 @@ class AlgoliaSyncService extends Component
         // do we update this type of element?
         $recordUpdate = array();
 
-        $algoliaSettings = AlgoliaSync::$plugin->getSettings();
-
         if (AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element)) {
 
             // what type of element
@@ -298,39 +300,39 @@ class AlgoliaSyncService extends Component
 
                 $fieldHandle = $field->handle;
 
-                    // send this off to a function to extract the specific information
-                    // based on what type of field it is (asset, text, varchar, etc...)
+                // send this off to a function to extract the specific information
+                // based on what type of field it is (asset, text, varchar, etc...)
 
-                    $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
+                $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
 
-                    $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
+                $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
 
-                    if (isset($rawData['type']) && $rawData['type'] == 'entries') {
-                        $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
-                        $idsFieldName = $fieldName.'Ids';
-                        $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
-                    }
-                    else {
-                        $recordUpdate['attributes'][$fieldName] = $rawData;
-                    }
+                if (isset($rawData['type']) && $rawData['type'] == 'entries') {
+                    $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
+                    $idsFieldName = $fieldName.'Ids';
+                    $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
+                }
+                else {
+                    $recordUpdate['attributes'][$fieldName] = $rawData;
+                }
 
-                    $fieldTypeLong = get_class($field);
-                    $fieldTypeArray = explode('\\', $fieldTypeLong);
-                    $fieldType = strtolower(array_pop($fieldTypeArray));
+                $fieldTypeLong = get_class($field);
+                $fieldTypeArray = explode('\\', $fieldTypeLong);
+                $fieldType = strtolower(array_pop($fieldTypeArray));
 
-                    // for the date field, create a few versions of the date
-                    // todo : add in a config for custom date format to be added
-                    if ($fieldType == 'date') {
-                        // get the friendly date
-                        $friendlyName = $fieldName . "_friendly";
-                        $friendlyDate = date('n/j/Y', $rawData);
-                        $recordUpdate['attributes'][$friendlyName] = $friendlyDate;
+                // for the date field, create a few versions of the date
+                // todo : add in a config for custom date format to be added
+                if ($fieldType == 'date') {
+                    // get the friendly date
+                    $friendlyName = $fieldName . "_friendly";
+                    $friendlyDate = date('n/j/Y', $rawData);
+                    $recordUpdate['attributes'][$friendlyName] = $friendlyDate;
 
-                        // get the previous midnight of the current date (unix timestamp)
-                        $midnightName = $fieldName . "_midnight";
-                        $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
-                        $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
-                    }
+                    // get the previous midnight of the current date (unix timestamp)
+                    $midnightName = $fieldName . "_midnight";
+                    $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
+                    $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
+                }
 
             }
 
@@ -341,13 +343,8 @@ class AlgoliaSyncService extends Component
 
             switch ($elementTypeSlug) {
                 case 'category':
-                    $recordUpdate['elementType'] = 'Category';
-                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
-                    $recordUpdate['attributes']['title'] = $element->title;
-                    break;
-
                 case 'entry':
-                    $recordUpdate['elementType'] = 'Entry';
+                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
                     break;
@@ -398,6 +395,10 @@ class AlgoliaSyncService extends Component
         $info['sectionId'] = [];
 
         switch ($info['type']) {
+            case 'asset':
+                $info['sectionHandle'][] = $element->volume->handle;
+                $info['sectionId'][] = $element->volume->id;
+                break;
             case 'category':
                 $info['sectionHandle'][] = Craft::$app->categories->getGroupById($element->groupId)->handle;
                 $info['sectionId'][] = $element->groupId;
@@ -419,7 +420,6 @@ class AlgoliaSyncService extends Component
                 $deleteFromAlgolia = true;
 
                 foreach ($userGroups AS $group) {
-
                     if (isset($syncedGroups[$group->id]) && $syncedGroups[$group->id]['sync'] == 1) {
                         $info['sectionHandle'][] = $group->handle;
                         $info['sectionId'][] = $group->id;
@@ -427,13 +427,14 @@ class AlgoliaSyncService extends Component
                     }
                 }
 
+                // there doesn't seem to be a way to see what group the user WAS in,
+                // so we need to purge them from all groups they are NOT in now.
                 // check that this user is NOT in Algolia any more
                 // if their user group used to match, but it's been changed
                 // and they need to be removed...
                 // this is where we send a quick message to Algolia to purge out their record
 
                 if ($deleteFromAlgolia && $processRecords) {
-
                     $elementData = [];
                     $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
                     $elementData['attributes'] = [];
@@ -441,19 +442,15 @@ class AlgoliaSyncService extends Component
 
                     AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord('delete', $elementData);
                 }
-
                 break;
         }
-
         return $info;
     }
 
     public function getAlgoliaIndex($element): array
     {
         $returnIndex = [];
-
         $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
-
         $envName = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
 
         foreach ($eventInfo['sectionHandle'] AS $handle) {
@@ -544,10 +541,8 @@ class AlgoliaSyncService extends Component
 
         return [
             ['label' => 'Entries',          'handle' => 'entry',            'data' => $entriesConfig],
-            ['label' => 'Asset Volumes',    'handle' => 'volume',           'data' => $volumesConfig],
+            ['label' => 'Asset Volumes',    'handle' => 'asset',            'data' => $volumesConfig],
             ['label' => 'Categories',       'handle' => 'category',         'data' => $categoriesConfig],
-//            ['label' => 'Tag Groups',       'handle' => 'tagGroup',         'data' => $tagGroupsConfig],
-            ['label' => 'Global Sets',      'handle' => 'globalSet',        'data' => $globalSetsConfig],
             ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig]
         ];
     }
