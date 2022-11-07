@@ -14,12 +14,14 @@ use brilliance\algoliasync\AlgoliaSync;
 
 use Craft;
 use craft\elements\Asset;
+use craft\elements\Tag;
 use craft\helpers\App;
 use craft\base\Component;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
 
+use craft\helpers\MoneyHelper;
 use craft\web\twig\Environment;
 use Twig\Environment as env;
 
@@ -103,6 +105,15 @@ class AlgoliaSyncService extends Component
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user);
                 }
                 break;
+
+            CASE 'tag':
+                $allTags = Tag::find()->groupId($sectionId)->all();
+                foreach ($allTags AS $tag) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($tag);
+                }
+                break;
+
+
         }
     }
 
@@ -169,7 +180,8 @@ class AlgoliaSyncService extends Component
 
     }
 
-    // todo : this was a poorly implemented solution to preventing specific field content from synced with Algolia.  Instead, implement a mechanism to choose specific fields to sync
+    // todo : this was a poorly implemented solution to preventing specific field content from synced with Algolia.
+    //  Instead, implement a mechanism to choose specific fields to sync (or not to sync)
     public function stopwordPass($fieldHandle, $stopword = '') {
         $stopword = trim($stopword);
         if ($stopword === '') {
@@ -184,10 +196,9 @@ class AlgoliaSyncService extends Component
         return true;
     }
 
-    public function getFieldData($element, $field, $fieldHandle) {
-
-        $fieldTypeLong = get_class($field);
-        $fieldTypeArray = explode('\\', $fieldTypeLong);
+    public function getFieldData($element, $field, $fieldHandle): mixed
+    {
+        $fieldTypeArray = explode('\\', get_class($field));
         $fieldType = strtolower(array_pop($fieldTypeArray));
 
         switch ($fieldType) {
@@ -197,6 +208,7 @@ class AlgoliaSyncService extends Component
                     return (float)$element->$fieldHandle;
                     }
                 return $element->$fieldHandle;
+
             case 'categories':
                 $categories = $element->$fieldHandle->all();
                 $returnCats = [];
@@ -204,25 +216,36 @@ class AlgoliaSyncService extends Component
                     $returnCats[] = $cat->title;
                 }
                 return $returnCats;
+
             case 'entries':
-                $allEntries = $element->$fieldHandle->all();
+            case 'tags':
+            case 'users':
+                $allRecords = $element->$fieldHandle->all();
 
                 $titlesArray = [];
                 $idsArray = [];
 
-                foreach ($allEntries AS $thisEntry) {
-                    $titlesArray[] = $thisEntry->title;
-                    $idsArray[] = $thisEntry->id;
+                foreach ($allRecords AS $thisRecord) {
+                    if ($fieldType == 'users') {
+                        $titlesArray[] = $thisRecord->username;
+                    }
+                    else {
+                        $titlesArray[] = $thisRecord->title;
+                    }
+                    $idsArray[] = $thisRecord->id;
                 }
                 return array(
-                    'type' => 'entries',
+                    'type' => $fieldType,
                     'ids'   => $idsArray,
                     'titles'    => $titlesArray
                 );
+
             case 'number':
                     return (float)$element->$fieldHandle;
+
             case 'lightswitch':
                     return (bool)$element->$fieldHandle;
+
             case 'multiselect':
             case 'checkboxes':
                 $storedOptions = [];
@@ -237,6 +260,8 @@ class AlgoliaSyncService extends Component
                 return $storedOptions;
             case 'dropdown':
                     return $element->$fieldHandle->label;
+            case 'radiobuttons':
+                return $element->$fieldHandle->value;
             case 'date':
                 if ($element->$fieldHandle) {
                     return $element->$fieldHandle->getTimestamp();
@@ -244,14 +269,47 @@ class AlgoliaSyncService extends Component
                 else {
                     return null;
                 }
+
             case 'assets':
-                $thisAsset = $element->$fieldHandle->one();
-                if ($thisAsset) {
-                    return $thisAsset->url;
+                if ($element->$fieldHandle->count() > 1) {
+                    $assetArray = [];
+                    $allAssets = $element->$fieldHandle->all();
+                    foreach ($allAssets AS $allAsset) {
+                        $assetArray[] = $allAsset->url;
+                    }
+                    return $assetArray;
                 }
                 else {
-                    return null;
+                    $thisAsset = $element->$fieldHandle->one();
+                    if ($thisAsset) {
+                        return $thisAsset->url;
+                    }
+                    else {
+                        return null;
+                    }
                 }
+
+            case 'money':
+
+                $moneyReturn = [];
+
+                $moneyReturn['type'] = 'money';
+                $moneyString = MoneyHelper::toString($element->$fieldHandle);
+                $moneyReturn['string'] = $moneyString;
+                $moneyFloat = (float)MoneyHelper::toDecimal($element->$fieldHandle);
+                $moneyReturn['float'] = $moneyFloat;
+
+                return $moneyReturn;
+
+            case 'color':
+                return $element->$fieldHandle->getHex();
+
+            case 'email':
+                return $element->$fieldHandle;
+
+            case 'url':
+                return $element->$fieldHandle;
+
             case 'mapfield':
                 return null;
         }
@@ -296,21 +354,25 @@ class AlgoliaSyncService extends Component
 
             $fields = $element->getFieldLayout()->customFields;
 
+            $arrayFieldTypes = array('entries','tags','users');
             foreach ($fields AS $field) {
 
                 $fieldHandle = $field->handle;
 
                 // send this off to a function to extract the specific information
                 // based on what type of field it is (asset, text, varchar, etc...)
-
                 $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
-
                 $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
 
-                if (isset($rawData['type']) && $rawData['type'] == 'entries') {
+                if (isset($rawData['type']) && in_array($rawData['type'],$arrayFieldTypes)) {
                     $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
                     $idsFieldName = $fieldName.'Ids';
                     $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
+                }
+                elseif (isset($rawData['type']) && $rawData['type'] == 'money') {
+                    $recordUpdate['attributes'][$fieldName] = $rawData['string'];
+                    $floatFieldName = $fieldName.'_float';
+                    $recordUpdate['attributes'][$floatFieldName] = $rawData['float'];
                 }
                 else {
                     $recordUpdate['attributes'][$fieldName] = $rawData;
@@ -344,6 +406,8 @@ class AlgoliaSyncService extends Component
             switch ($elementTypeSlug) {
                 case 'category':
                 case 'entry':
+                case 'asset':
+                case 'tag':
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
@@ -406,6 +470,12 @@ class AlgoliaSyncService extends Component
             case 'entry':
                 if (!empty($element->sectionId)) {
                     $info['sectionHandle'][] = Craft::$app->sections->getSectionById($element->sectionId)->handle;
+                    $info['sectionId'][] = $element->sectionId;
+                }
+                break;
+            case 'tag':
+                if (!empty($element->sectionId)) {
+                    $info['sectionHandle'][] = Craft::$app->tags->getTagGroupById($element->sectionId)->handle;
                     $info['sectionId'][] = $element->sectionId;
                 }
                 break;
@@ -515,17 +585,21 @@ class AlgoliaSyncService extends Component
             );
         }
 
-        // $globalSetsConfig
-        $globalSets = Craft::$app->globals->getAllSets();
-        $globalSetsConfig = [];
-        foreach ($globalSets AS $globalSet) {
-            $globalSetsConfig[] = array(
-                'default_index' => $env.'_global_'.$globalSet->handle,
-                'label' => $globalSet->name,
-                'handle' => $globalSet->handle,
-                'value' => $globalSet->id
-            );
-        }
+        // We are not supporting Global Sets until I find a use case that I can build towards
+        // this would only create a single record in Algolia, which defeats the whole point of search
+        // please let us know if you have a specific use case and we can add in support to meet the need
+
+//        // $globalSetsConfig
+//        $globalSets = Craft::$app->globals->getAllSets();
+//        $globalSetsConfig = [];
+//        foreach ($globalSets AS $globalSet) {
+//            $globalSetsConfig[] = array(
+//                'default_index' => $env.'_global_'.$globalSet->handle,
+//                'label' => $globalSet->name,
+//                'handle' => $globalSet->handle,
+//                'value' => $globalSet->id
+//            );
+//        }
 
         // user groups list
         $userGroups = Craft::$app->userGroups->getAllGroups();
@@ -543,7 +617,8 @@ class AlgoliaSyncService extends Component
             ['label' => 'Entries',          'handle' => 'entry',            'data' => $entriesConfig],
             ['label' => 'Asset Volumes',    'handle' => 'asset',            'data' => $volumesConfig],
             ['label' => 'Categories',       'handle' => 'category',         'data' => $categoriesConfig],
-            ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig]
+            ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig],
+            ['label' => 'Tag Groups',       'handle' => 'tag',              'data' => $tagGroupsConfig]
         ];
     }
 }
