@@ -505,9 +505,21 @@ class AlgoliaSyncService extends Component
     public function getAlgoliaIndex($element): array
     {
         $returnIndex = [];
-        $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
-        $env = $this->getEnvironment();
 
+        $allSettings = AlgoliaSync::$plugin->getSettings();
+        $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
+
+        foreach ($eventInfo['sectionId'] as $sectionId) {
+            $potentialIndexOverride = $allSettings['algoliaElements'][$eventInfo['type']][$sectionId]['customIndex'];
+            if (is_array($potentialIndexOverride) && count($potentialIndexOverride) > 0) {
+                foreach ($potentialIndexOverride AS $indexOverride) {
+                    $returnIndex[] = $indexOverride;
+                }
+                return $returnIndex;
+            }
+        }
+
+        $env = $this->getEnvironment();
         foreach ($eventInfo['sectionHandle'] AS $handle) {
             $returnIndex[] = $env.'_'.$eventInfo['type'].'_'.$handle;
         }
