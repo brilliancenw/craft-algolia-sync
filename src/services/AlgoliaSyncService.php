@@ -21,13 +21,11 @@ use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
 
-use craft\helpers\MoneyHelper;
-//use craft\web\twig\Environment;
-//use Twig\Environment as env;
-
 use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
 use brilliance\algoliasync\jobs\AlgoliaSyncTask;
+
+use Algolia\AlgoliaSearch\SearchClient;
 
 /**
  * AlgoliaSyncService Service
@@ -66,7 +64,8 @@ class AlgoliaSyncService extends Component
         if (isset($filterCompany) && $filterCompany > 0) {
             $algoliaConfig['filters'] = 'company_'.$filterCompany;
         }
-        $public_key = \AlgoliaSearch\Client::generateSecuredApiKey(
+
+        $public_key = SearchClient::generateSecuredApiKey(
             AlgoliaSync::$plugin->settings->getAlgoliaSearch(),
             $algoliaConfig
         );
@@ -289,23 +288,6 @@ class AlgoliaSyncService extends Component
                     }
                 }
 
-            case 'money':
-                $moneyReturn = [];
-
-                if ($element->$fieldHandle) {
-                    $moneyString = MoneyHelper::toString($element->$fieldHandle);
-                    $moneyFloat = (float)MoneyHelper::toDecimal($element->$fieldHandle);
-                }
-                else {
-                    $moneyString = null;
-                    $moneyFloat = null;
-                }
-                $moneyReturn['type'] = 'money';
-                $moneyReturn['string'] = $moneyString;
-                $moneyReturn['float'] = $moneyFloat;
-
-                return $moneyReturn;
-
             case 'color':
                 if ($element->$fieldHandle) {
                     return $element->$fieldHandle->getHex();
@@ -359,9 +341,10 @@ class AlgoliaSyncService extends Component
                 $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
             }
 
-            $fields = $element->getFieldLayout()->customFields;
+            $fields = $element->getFieldLayout()->getFields();
 
             $arrayFieldTypes = array('entries','tags','users');
+
             foreach ($fields AS $field) {
 
                 $fieldHandle = $field->handle;
@@ -375,11 +358,6 @@ class AlgoliaSyncService extends Component
                     $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
                     $idsFieldName = $fieldName.'Ids';
                     $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
-                }
-                elseif (isset($rawData['type']) && $rawData['type'] == 'money') {
-                    $recordUpdate['attributes'][$fieldName] = $rawData['string'];
-                    $floatFieldName = $fieldName.'_float';
-                    $recordUpdate['attributes'][$floatFieldName] = $rawData['float'];
                 }
                 else {
                     $recordUpdate['attributes'][$fieldName] = $rawData;
@@ -528,10 +506,10 @@ class AlgoliaSyncService extends Component
     {
         $returnIndex = [];
         $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
-        $envName = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+        $env = $this->getEnvironment();
 
         foreach ($eventInfo['sectionHandle'] AS $handle) {
-            $returnIndex[] = $envName.'_'.$eventInfo['type'].'_'.$handle;
+            $returnIndex[] = $env.'_'.$eventInfo['type'].'_'.$handle;
         }
 
         return $returnIndex;
@@ -539,13 +517,13 @@ class AlgoliaSyncService extends Component
 
     // AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaSupportedElements()
     public function getAlgoliaSupportedElements(): array {
-        $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+        $env = $this->getEnvironment();
 
         // all Channel Sections
         $entriesConfig = array();
         $allSections = Craft::$app->sections->getAllSections();
         foreach ($allSections as $section) {
-            if ($section->type == 'channel') {
+            if (in_array($section->type, ['channel','structure'])) {
                 $sectionIndex = 'section-'.$section->id;
                 $entriesConfig[$sectionIndex] = array(
                     'default_index' => $env.'_section_'.$section->handle,
@@ -627,5 +605,17 @@ class AlgoliaSyncService extends Component
             ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig],
             ['label' => 'Tag Groups',       'handle' => 'tag',              'data' => $tagGroupsConfig]
         ];
+    }
+
+    public function getEnvironment() {
+        if (getenv('ENVIRONMENT')) {
+            return getenv('ENVIRONMENT');
+        }
+        else if (getenv('CRAFT_ENVIRONMENT')) {
+            return getenv('CRAFT_ENVIRONMENT');
+        }
+        else {
+            return 'site';
+        }
     }
 }
