@@ -15,6 +15,8 @@ use brilliance\algoliasync\AlgoliaSync;
 use Craft;
 use craft\queue\BaseJob;
 
+use Algolia\AlgoliaSearch\SearchClient;
+
 /**
  * AlgoliaSyncTask job
  *
@@ -74,7 +76,10 @@ class AlgoliaSyncTask extends BaseJob
     public function execute($queue): void
     {
 
-        $client = new \AlgoliaSearch\Client(AlgoliaSync::$plugin->settings->getAlgoliaApp(), AlgoliaSync::$plugin->settings->getAlgoliaAdmin());
+        $client = SearchClient::create(
+            AlgoliaSync::$plugin->settings->getAlgoliaApp(),
+            AlgoliaSync::$plugin->settings->getAlgoliaAdmin()
+        );
 
         foreach ($this->algoliaIndex AS $index) {
 
@@ -84,11 +89,11 @@ class AlgoliaSyncTask extends BaseJob
 
             SWITCH ($this->algoliaFunction) {
                 CASE 'insert':
-                    $response = $clientIndex->addObject($this->algoliaRecord);
+                    $clientIndex->saveObject($this->algoliaRecord)->wait();
                     break;
 
                 CASE 'delete':
-                    $response = $clientIndex->deleteObject($this->algoliaObjectID);
+                    $clientIndex->deleteObject($this->algoliaObjectID);
                     break;
             }
 

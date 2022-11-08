@@ -21,7 +21,7 @@
         }
     ],
     "require": {
-        "craftcms/cms": ">=3.4.18",
+        "craftcms/cms": ">=3.4.18 <4",
         "algolia/algoliasearch-client-php": "^3"
     },
     "autoload": {
