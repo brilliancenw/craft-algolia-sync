@@ -22,8 +22,8 @@ use craft\elements\Category;
 use craft\elements\User;
 
 use craft\helpers\MoneyHelper;
-use craft\web\twig\Environment;
-use Twig\Environment as env;
+//use craft\web\twig\Environment;
+//use Twig\Environment as env;
 
 use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
@@ -290,31 +290,38 @@ class AlgoliaSyncService extends Component
                 }
 
             case 'money':
-
                 $moneyReturn = [];
 
+                if ($element->$fieldHandle) {
+                    $moneyString = MoneyHelper::toString($element->$fieldHandle);
+                    $moneyFloat = (float)MoneyHelper::toDecimal($element->$fieldHandle);
+                }
+                else {
+                    $moneyString = null;
+                    $moneyFloat = null;
+                }
                 $moneyReturn['type'] = 'money';
-                $moneyString = MoneyHelper::toString($element->$fieldHandle);
                 $moneyReturn['string'] = $moneyString;
-                $moneyFloat = (float)MoneyHelper::toDecimal($element->$fieldHandle);
                 $moneyReturn['float'] = $moneyFloat;
 
                 return $moneyReturn;
 
             case 'color':
-                return $element->$fieldHandle->getHex();
-
+                if ($element->$fieldHandle) {
+                    return $element->$fieldHandle->getHex();
+                }
+                break;
             case 'email':
-                return $element->$fieldHandle;
-
             case 'url':
                 return $element->$fieldHandle;
 
+            // TODO: Add support for other fields,
+            // with maps being at the top of the list
+            // to support location searches in Algolia
             case 'mapfield':
                 return null;
         }
         return null;
-
     }
 
     public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '') {
