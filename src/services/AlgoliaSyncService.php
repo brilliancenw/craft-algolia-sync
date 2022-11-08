@@ -511,10 +511,9 @@ class AlgoliaSyncService extends Component
 
         foreach ($eventInfo['sectionId'] as $sectionId) {
             $potentialIndexOverride = $allSettings['algoliaElements'][$eventInfo['type']][$sectionId]['customIndex'];
-            if (is_array($potentialIndexOverride) && count($potentialIndexOverride) > 0) {
-                foreach ($potentialIndexOverride AS $indexOverride) {
-                    $returnIndex[] = $indexOverride;
-                }
+
+            if (!empty($potentialIndexOverride)) {
+                $returnIndex[] = $potentialIndexOverride;
                 return $returnIndex;
             }
         }
