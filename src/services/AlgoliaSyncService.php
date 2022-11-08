@@ -22,8 +22,6 @@ use craft\elements\Category;
 use craft\elements\User;
 
 use craft\helpers\MoneyHelper;
-//use craft\web\twig\Environment;
-//use Twig\Environment as env;
 
 use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
@@ -528,7 +526,7 @@ class AlgoliaSyncService extends Component
     {
         $returnIndex = [];
         $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
-        $envName = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+        $envName = $this->getEnvironment();
 
         foreach ($eventInfo['sectionHandle'] AS $handle) {
             $returnIndex[] = $envName.'_'.$eventInfo['type'].'_'.$handle;
@@ -539,7 +537,7 @@ class AlgoliaSyncService extends Component
 
     // AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaSupportedElements()
     public function getAlgoliaSupportedElements(): array {
-        $env = strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+        $env = $this->getEnvironment();
 
         // all Channel Sections
         $entriesConfig = array();
@@ -628,4 +626,9 @@ class AlgoliaSyncService extends Component
             ['label' => 'Tag Groups',       'handle' => 'tag',              'data' => $tagGroupsConfig]
         ];
     }
+
+    public function getEnvironment(): string {
+        return strtolower(App::env('CRAFT_ENVIRONMENT') ?? App::env('ENVIRONMENT') ?? 'site');
+    }
+
 }
