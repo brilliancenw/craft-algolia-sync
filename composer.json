@@ -10,10 +10,10 @@
         "algolia sync"
     ],
     "support": {
-        "docs": "https://www.brilliancenw.com/algolia-sync",
-        "issues": "https://www.brilliancenw.com/algolia-sync"
+        "docs": "https://github.com/brilliancenw/craft-algolia-sync",
+        "issues": "https://github.com/brilliancenw/craft-algolia-sync/issues"
     },
-    "license": "MIT",
+    "license": "Craft",
     "authors": [
         {
             "name": "Brilliance",
