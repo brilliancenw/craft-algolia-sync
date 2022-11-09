@@ -30,9 +30,6 @@ use brilliance\algoliasync\jobs\AlgoliaSyncTask;
 /**
  * AlgoliaSyncService Service
  *
- * All of your plugin’s business logic should go in services, including saving data,
- * retrieving data, etc. They provide APIs that your controllers, template variables,
- * and other plugins can interact with.
  *
  * https://craftcms.com/docs/plugins/services
  *
@@ -313,11 +310,36 @@ class AlgoliaSyncService extends Component
             case 'url':
                 return $element->$fieldHandle;
 
-            // TODO: Add support for other fields,
-            // with maps being at the top of the list
-            // to support location searches in Algolia
+            // support for "Maps" (formerly "Simple Maps")
+            // https://plugins.craftcms.com/simplemap
             case 'mapfield':
-                return null;
+
+                $mapInfo = [];
+
+                $mapInfo['type'] = 'mapfield';
+                $mapInfo['lat'] = $element->$fieldHandle->lat;
+                $mapInfo['lng'] = $element->$fieldHandle->lng;
+                $mapInfo['zoom'] = $element->$fieldHandle->zoom;
+                $mapInfo['address'] = $element->$fieldHandle->address;
+                $mapInfo['what3words'] = $element->$fieldHandle->what3words;
+                $mapInfo['parts'] = [];
+                $mapInfo['parts']['number'] = $element->$fieldHandle->number;
+                $mapInfo['parts']['address'] = $element->$fieldHandle->address;
+                $mapInfo['parts']['city'] = $element->$fieldHandle->city;
+                $mapInfo['parts']['postcode'] = $element->$fieldHandle->postcode;
+                $mapInfo['parts']['county'] = $element->$fieldHandle->county;
+                $mapInfo['parts']['state'] = $element->$fieldHandle->state;
+                $mapInfo['parts']['country'] = $element->$fieldHandle->country;
+                $mapInfo['parts']['planet'] = $element->$fieldHandle->planet;
+                $mapInfo['parts']['system'] = $element->$fieldHandle->system;
+                $mapInfo['parts']['arm'] = $element->$fieldHandle->arm;
+                $mapInfo['parts']['galaxy'] = $element->$fieldHandle->galaxy;
+                $mapInfo['parts']['group'] = $element->$fieldHandle->group;
+                $mapInfo['parts']['cluster'] = $element->$fieldHandle->cluster;
+                $mapInfo['parts']['supercluster'] = $element->$fieldHandle->supercluster;
+
+                return $mapInfo;
+
         }
         return null;
     }
@@ -378,6 +400,22 @@ class AlgoliaSyncService extends Component
                     $recordUpdate['attributes'][$fieldName] = $rawData['string'];
                     $floatFieldName = $fieldName.'_float';
                     $recordUpdate['attributes'][$floatFieldName] = $rawData['float'];
+                }
+                elseif (isset($rawData['type']) && $rawData['type'] == 'mapfield') {
+                    $recordUpdate['attributes'][$fieldName] = $rawData;
+                    $recordUpdate['attributes'][$fieldName.'_address'] = $rawData['address'];
+                    $recordUpdate['attributes'][$fieldName.'_lat'] = $rawData['lat'];
+                    $recordUpdate['attributes'][$fieldName.'_lng'] = $rawData['lng'];
+                    $recordUpdate['attributes'][$fieldName.'_zoom']['zoom'] = $rawData['zoom'];
+                    if (!empty($rawData['lat']) && !empty($rawData['lng'])) {
+                        // https://www.algolia.com/doc/guides/managing-results/refine-results/geolocation/#enabling-geo-search-by-adding-geolocation-data-to-records
+                        // inject a _geoloc into Algolia
+                        // this doesn't take into account if there are multiple _geoloc...
+                        // that will be more complex to resolve
+                        $recordUpdate['attributes']['_geoloc'] = [];
+                        $recordUpdate['attributes']['_geoloc']['lat'] = $rawData['lat'];
+                        $recordUpdate['attributes']['_geoloc']['lng'] = $rawData['lng'];
+                    }
                 }
                 else {
                     $recordUpdate['attributes'][$fieldName] = $rawData;
