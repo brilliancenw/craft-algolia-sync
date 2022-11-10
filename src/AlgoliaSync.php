@@ -73,7 +73,7 @@ class AlgoliaSync extends Plugin
      *
      * @var AlgoliaSync
      */
-    public static AlgoliaSync $plugin;
+    public static $plugin;
 
     // Public Properties
     // =========================================================================
