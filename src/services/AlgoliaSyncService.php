@@ -119,7 +119,7 @@ class AlgoliaSyncService extends Component
 
 
     // is this element one that is configured to be synced with Algolia?
-    public function algoliaElementSynced($element): bool
+    public function algoliaElementSynced($element)
     {
         $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
         $algoliaSettings = AlgoliaSync::$plugin->getSettings();
@@ -196,7 +196,7 @@ class AlgoliaSyncService extends Component
         return true;
     }
 
-    public function getFieldData($element, $field, $fieldHandle): mixed
+    public function getFieldData($element, $field, $fieldHandle)
     {
         $fieldTypeArray = explode('\\', get_class($field));
         $fieldType = strtolower(array_pop($fieldTypeArray));
@@ -546,7 +546,7 @@ class AlgoliaSyncService extends Component
         return $info;
     }
 
-    public function getAlgoliaIndex($element): array
+    public function getAlgoliaIndex($element)
     {
         $returnIndex = [];
 
@@ -571,7 +571,7 @@ class AlgoliaSyncService extends Component
     }
 
     // AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaSupportedElements()
-    public function getAlgoliaSupportedElements(): array {
+    public function getAlgoliaSupportedElements() {
         $env = $this->getEnvironment();
 
         // all Channel Sections
