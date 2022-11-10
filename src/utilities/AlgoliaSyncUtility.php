@@ -60,7 +60,7 @@ class AlgoliaSyncUtility extends Utility
      *
      * @return string|null The path to the utility SVG icon
      */
-    public static function iconPath() : string|null
+    public static function iconPath()
     {
         return Craft::getAlias("@brilliance/algoliasync/icon.svg");
     }
