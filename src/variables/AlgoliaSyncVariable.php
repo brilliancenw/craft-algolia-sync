@@ -42,7 +42,7 @@ class AlgoliaSyncVariable
      * @return string
      */
 
-    public function algoliaApiKey(): string
+    public function algoliaApiKey()
     {
 
         $isAdmin = Craft::$app->user->getIsAdmin();

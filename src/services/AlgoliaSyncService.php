@@ -56,7 +56,7 @@ class AlgoliaSyncService extends Component
      * @return string
      */
 
-    public function generateSecuredApiKey($filterCompany=null): string
+    public function generateSecuredApiKey($filterCompany=null)
     {
         $algoliaConfig = [];
         $validUntil = time() + (60 * 60 * 24);

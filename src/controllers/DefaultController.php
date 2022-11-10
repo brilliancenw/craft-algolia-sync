@@ -56,7 +56,7 @@ class DefaultController extends Controller
      *
      * @return mixed
      */
-    public function actionIndex(): craft\web\Response
+    public function actionIndex()
     {
 
 //        $result = array();

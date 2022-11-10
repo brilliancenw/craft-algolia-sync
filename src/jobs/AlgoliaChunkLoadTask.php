@@ -60,9 +60,9 @@ class AlgoliaChunkLoadTask extends BaseJob
      * @var string
      */
     public $loadRecordType = [];
-    public int $offset = 0;
-    public int $limit = 100;
-    public string $elementType = '';
+    public $offset = 0;
+    public $limit = 100;
+    public $elementType = '';
 
     // Public Methods
     // =========================================================================
@@ -75,7 +75,7 @@ class AlgoliaChunkLoadTask extends BaseJob
      *
      * More info: https://github.com/yiisoft/yii2-queue
      */
-    public function execute($queue): void
+    public function execute($queue)
     {
         // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
@@ -156,7 +156,7 @@ class AlgoliaChunkLoadTask extends BaseJob
      *
      * @return string The default task description
      */
-    protected function defaultDescription(): string
+    protected function defaultDescription()
     {
         return Craft::t('algolia-sync', 'Algolia Chunked Task');
     }
