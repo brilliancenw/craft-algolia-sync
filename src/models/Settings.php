@@ -40,24 +40,24 @@ class Settings extends Model
      *
      * @var string
      */
-    public string $algoliaAdmin = ''; // ALGOLIA_ADMIN
-    public string $algoliaApp = '';              // ALGOLIA_APP
-    public string $algoliaSearch = ''; // ALGOLIA_SEARCH
-    public array $algoliaElements     = []; // sections, categories, usergroups, etc...
+    public $algoliaAdmin = ''; // ALGOLIA_ADMIN
+    public $algoliaApp = '';              // ALGOLIA_APP
+    public $algoliaSearch = ''; // ALGOLIA_SEARCH
+    public $algoliaElements     = []; // sections, categories, usergroups, etc...
 
-    public function getAlgoliaAdmin(): string
+    public function getAlgoliaAdmin()
     {
         return App::parseEnv($this->algoliaAdmin);
     }
-    public function getAlgoliaApp(): string
+    public function getAlgoliaApp()
     {
         return App::parseEnv($this->algoliaApp);
     }
-    public function getAlgoliaSearch(): string
+    public function getAlgoliaSearch()
     {
         return App::parseEnv($this->algoliaSearch);
     }
-    public function rules(): array
+    public function rules()
     {
         return [];
     }
