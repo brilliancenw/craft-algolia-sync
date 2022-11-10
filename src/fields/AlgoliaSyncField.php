@@ -44,7 +44,7 @@ class AlgoliaSyncField extends Field
      *
      * @return string The display name of this class.
      */
-    public static function displayName(): string
+    public static function displayName()
     {
         return Craft::t('algolia-sync', 'Algolia Sync Field');
     }
@@ -62,7 +62,7 @@ class AlgoliaSyncField extends Field
      *
      * @return array
      */
-    public function rules(): array
+    public function rules()
     {
         $rules = parent::rules();
         $rules = array_merge($rules, [
@@ -83,7 +83,7 @@ class AlgoliaSyncField extends Field
      * appended as well.
      * @see \yii\db\QueryBuilder::getColumnType()
      */
-    public function getContentColumnType(): string
+    public function getContentColumnType()
     {
         return Schema::TYPE_STRING;
     }
@@ -101,7 +101,7 @@ class AlgoliaSyncField extends Field
      *
      * @return mixed The prepared field value
      */
-    public function normalizeValue($value, ElementInterface $element = null): mixed
+    public function normalizeValue($value, ElementInterface $element = null)
     {
         return $value;
     }
@@ -119,7 +119,7 @@ class AlgoliaSyncField extends Field
      *
      * @return null|false `false` in the event that the method is sure that no elements are going to be found.
      */
-    public function serializeValue($value, ElementInterface $element = null): null|bool
+    public function serializeValue($value, ElementInterface $element = null)
     {
         return parent::serializeValue($value, $element);
     }
@@ -216,7 +216,7 @@ class AlgoliaSyncField extends Field
      *
      * @return string|null
      */
-    public function getSettingsHtml(): string|null
+    public function getSettingsHtml()
     {
         // Render the settings template
         return Craft::$app->getView()->renderTemplate(

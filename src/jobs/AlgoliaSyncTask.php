@@ -57,11 +57,11 @@ class AlgoliaSyncTask extends BaseJob
      *
      * @var string
      */
-    public array $algoliaIndex = [];
-    public string $algoliaFunction = ''; // delete or insert
-    public int $algoliaObjectID = 0;
-    public array $algoliaRecord = [];
-    public string $algoliaMessage = 'Algolia Sync Task';
+    public $algoliaIndex = [];
+    public $algoliaFunction = ''; // delete or insert
+    public $algoliaObjectID = 0;
+    public $algoliaRecord = [];
+    public $algoliaMessage = 'Algolia Sync Task';
 
     // Public Methods
     // =========================================================================
@@ -73,7 +73,7 @@ class AlgoliaSyncTask extends BaseJob
      *
      * More info: https://github.com/yiisoft/yii2-queue
      */
-    public function execute($queue): void
+    public function execute($queue)
     {
 
         $client = SearchClient::create(
@@ -110,7 +110,7 @@ class AlgoliaSyncTask extends BaseJob
      *
      * @return string The default task description
      */
-    protected function defaultDescription(): string
+    protected function defaultDescription()
     {
         return Craft::t('algolia-sync', 'Algolia Sync Task');
     }

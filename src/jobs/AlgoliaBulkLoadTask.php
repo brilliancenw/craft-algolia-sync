@@ -62,8 +62,8 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
      *
      * @var string
      */
-    public string|array $loadRecordType = [];
-    public int $standardLimit = 100;
+    public $loadRecordType = [];
+    public $standardLimit = 100;
 
     // Public Methods
     // =========================================================================
@@ -79,7 +79,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
     /**
      * @inheritDoc
      */
-    public function canRetry($attempt, $error): bool
+    public function canRetry($attempt, $error)
     {
         $attempts = AlgoliaSync::$plugin->getSettings()->queueMaxRetry ?? AlgoliaSync::getInstance()->queue->attempts;
         return $attempt < $attempts;
@@ -92,7 +92,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
      *
      * More info: https://github.com/yiisoft/yii2-queue
      */
-    public function execute($queue): void
+    public function execute($queue)
     {
         // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
@@ -181,7 +181,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
      *
      * @return string The default task description
      */
-    protected function defaultDescription(): string
+    protected function defaultDescription()
     {
         return Craft::t('algolia-sync', 'Algolia Sync');
     }
