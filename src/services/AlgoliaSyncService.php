@@ -367,7 +367,7 @@ class AlgoliaSyncService extends Component
                 $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
             }
 
-            $fields = $element->getFieldLayout()->getFields();
+            $fields = $element->getFieldLayout()->customFields;
 
             $arrayFieldTypes = array('entries','tags','users');
 
