@@ -59,7 +59,7 @@ class AlgoliaChunkLoadTask extends BaseJob
      *
      * @var string
      */
-    public string|array $loadRecordType = [];
+    public $loadRecordType = [];
     public int $offset = 0;
     public int $limit = 100;
     public string $elementType = '';

@@ -19,12 +19,14 @@ use craft\base\Component;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
+use craft\helpers\App;
 
 use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
 use brilliance\algoliasync\jobs\AlgoliaSyncTask;
 
 use Algolia\AlgoliaSearch\SearchClient;
+
 
 /**
  * AlgoliaSyncService Service
@@ -367,7 +369,7 @@ class AlgoliaSyncService extends Component
                 $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
             }
 
-            $fields = $element->getFieldLayout()->customFields;
+            $fields = $element->getFieldLayout()->getFields();
 
             $arrayFieldTypes = array('entries','tags','users');
 
@@ -555,7 +557,7 @@ class AlgoliaSyncService extends Component
             $potentialIndexOverride = $allSettings['algoliaElements'][$eventInfo['type']][$sectionId]['customIndex'];
 
             if (!empty($potentialIndexOverride)) {
-                $returnIndex[] = $potentialIndexOverride;
+                $returnIndex[] = App::parseEnv($potentialIndexOverride);
                 return $returnIndex;
             }
         }
