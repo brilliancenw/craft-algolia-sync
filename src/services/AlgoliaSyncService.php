@@ -15,7 +15,6 @@ use brilliance\algoliasync\AlgoliaSync;
 use Craft;
 use craft\elements\Asset;
 use craft\elements\Tag;
-use craft\helpers\App;
 use craft\base\Component;
 use craft\elements\Entry;
 use craft\elements\Category;
@@ -298,7 +297,7 @@ class AlgoliaSyncService extends Component
                 return $element->$fieldHandle;
 
             // TODO: Add support for other fields,
-            // with maps being at the top of the list
+            // with maps being at the top of the list$fields = $element->getFieldLayout()->getFields();
             // to support location searches in Algolia
             // support for "Maps" (formerly "Simple Maps")
             // https://plugins.craftcms.com/simplemap
