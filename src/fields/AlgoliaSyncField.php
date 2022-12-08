@@ -44,7 +44,7 @@ class AlgoliaSyncField extends Field
      *
      * @return string The display name of this class.
      */
-    public static function displayName()
+    public static function displayName(): string
     {
         return Craft::t('algolia-sync', 'Algolia Sync Field');
     }
