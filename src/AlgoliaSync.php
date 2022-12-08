@@ -188,9 +188,7 @@ class AlgoliaSync extends Plugin
             User::class,
             User::EVENT_AFTER_SAVE,
             function (ModelEvent $event) {
-
-
-
+                
                 $thisEventId = (int)$event->sender->id;
 
                 static $recursionLevel = 0;
