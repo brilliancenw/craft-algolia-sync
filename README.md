@@ -46,14 +46,14 @@ Here's an example of updating the value of the field with handle `myCustomFieldH
             }
         );
 
-##Some specific Field Types
+## Some specific Field Types
 
-###Asset Fields
+### Asset Fields
 When a record has an Asset field, if there is only one asset added, it will be a string of the URL of the asset.
 If there are more than one assets added to that field in that record, it will be an array of the URLs of the asset.
 This makes featured images very useful when configured in Algolia to be the image of the record.
 
-###Date Fields
+### Date Fields
 For every date field, three fields are sent to Algolia.
 1. The unix timestamp of the date
 2. The "friendly" view of the date (in American format `m/d/Y`)
