@@ -148,20 +148,25 @@ class AlgoliaSyncService extends Component
 
     public function algoliaSyncRecord($action, $recordUpdate, $queueMessage = '') {
 
-        $message = "[".$action."] Algolia Sync record to queue with the following data:\n";
-        $message .= print_r($recordUpdate['index'], true);
-        $message .= print_r($recordUpdate, true);
+        if (isset($recordUpdate['processAlgoliaSync']) && $recordUpdate['processAlgoliaSync'] === false) {
+            // do not process this record
+            $message = "[".$action."] Record skipped\n";
+        }
+        else {
+            $message = "[".$action."] Algolia Sync record to queue with the following data:\n";
+            $message .= print_r($recordUpdate['index'], true);
+            $message .= print_r($recordUpdate, true);
 
+            $queue = Craft::$app->getQueue();
+            $queue->push(new AlgoliaSyncTask([
+                'algoliaIndex' => $recordUpdate['index'],
+                'algoliaFunction' => $action,
+                'algoliaObjectID' => $recordUpdate['attributes']['objectID'],
+                'algoliaRecord' => $recordUpdate['attributes'],
+                'algoliaMessage' => $queueMessage
+            ]));
+        }
         Craft::info($message, 'algolia-sync');
-
-        $queue = Craft::$app->getQueue();
-        $queue->push(new AlgoliaSyncTask([
-            'algoliaIndex' => $recordUpdate['index'],
-            'algoliaFunction' => $action,
-            'algoliaObjectID' => $recordUpdate['attributes']['objectID'],
-            'algoliaRecord' => $recordUpdate['attributes'],
-            'algoliaMessage' => $queueMessage
-        ]));
 
     }
 

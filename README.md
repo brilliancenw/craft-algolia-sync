@@ -43,7 +43,12 @@ Here's an example of updating the value of the field with handle `myCustomFieldH
             \brilliance\algoliasync\services\AlgoliaSyncService::EVENT_BEFORE_ALGOLIA_SYNC,
             function (\brilliance\algoliasync\events\beforeAlgoliaSyncEvent $event) {
                 $event->recordUpdate['attributes']['myCustomFieldHandle'] = "Updating the content of this field";
-            }
+
+                // to prevent a record from being added, edited or deleted in Algolia
+                // set the following flag.
+                // $event->recordUpdate['processAlgoliaSync'] = false;
+                
+                }
         );
 
 ## Some specific Field Types
@@ -71,6 +76,8 @@ AND
 `GenreIds [1,2,3]`
 
 This can be used for some very complex JS work on the display of your search results in instantsearch.
+
+
 
 ## Algolia Sync Roadmap
 
