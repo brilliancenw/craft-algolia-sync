@@ -124,17 +124,18 @@ class AlgoliaSyncService extends Component
         $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
         $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
-        SWITCH ($elementInfo['type']) {
-            CASE 'entry':
-            CASE 'category':
-            CASE 'asset':
+        $className = get_class($element);
+
+        SWITCH ($className) {
+            CASE 'craft\elements\Entry':
+            CASE 'craft\elements\Category':
+            CASE 'craft\elements\Asset':
                 if (isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync']) && $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1) {
                     return true;
                 }
             return false;
 
-            CASE 'user':
-
+            CASE 'craft\elements\User':
                 if (count($elementInfo['sectionId']) > 0) {
                     $userGroups = $elementInfo['sectionId'];
                     $syncedGroups = $algoliaSettings['algoliaElements']['user'];
