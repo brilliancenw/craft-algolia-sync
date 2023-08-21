@@ -130,6 +130,7 @@ class AlgoliaSyncService extends Component
             CASE 'craft\elements\Entry':
             CASE 'craft\elements\Category':
             CASE 'craft\elements\Asset':
+
                 if (isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync']) && $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1) {
                     return true;
                 }
@@ -148,6 +149,7 @@ class AlgoliaSyncService extends Component
                 }
             break;
         }
+        
         return false;
     }
 
