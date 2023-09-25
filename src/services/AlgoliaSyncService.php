@@ -576,7 +576,7 @@ class AlgoliaSyncService extends Component
             $potentialIndexOverride = $allSettings['algoliaElements'][$eventInfo['type']][$sectionId]['customIndex'];
 
             if (!empty($potentialIndexOverride)) {
-                $returnIndex[] = $potentialIndexOverride;
+                $returnIndex[] = App::parseEnv($potentialIndexOverride);
                 return $returnIndex;
             }
         }
