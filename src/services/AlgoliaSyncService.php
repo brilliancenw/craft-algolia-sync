@@ -597,7 +597,7 @@ class AlgoliaSyncService extends Component
         $entriesConfig = array();
         $allSections = Craft::$app->sections->getAllSections();
         foreach ($allSections as $section) {
-            if ($section->type == 'channel') {
+            if ($section->type == 'channel' || $section->type == 'structure') {
                 $sectionIndex = 'section-'.$section->id;
                 $entriesConfig[$sectionIndex] = array(
                     'default_index' => $env.'_section_'.$section->handle,
