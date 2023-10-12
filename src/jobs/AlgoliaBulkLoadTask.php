@@ -57,6 +57,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
     // Public Properties
     // =========================================================================
 
+
     /**
      * Some attribute
      *
@@ -103,7 +104,11 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
         //[3] => [entry][5]
         //[4] => [user][1]
 
+        AlgoliaSync::$plugin->algoliaSyncService->logger("Executing the Queue", basename(__FILE__) , __LINE__);
+
         list($elementType,$sectionId) = $this->loadRecordType;
+
+        AlgoliaSync::$plugin->algoliaSyncService->logger("Loading the type of '".$elementType."' with ID #".$sectionId, basename(__FILE__) , __LINE__);
 
         SWITCH ($elementType) {
             CASE 'entry':
@@ -126,6 +131,33 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 }
 
             break;
+
+            CASE 'variant':
+
+                // loading too many causes a timeout and memory issue...
+                // breaking these updates into 100 record chunks
+
+                $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
+
+                if ($commercePlugin) {
+
+                    $variantCount = \craft\commerce\elements\Variant::find()->typeId($sectionId)->count();
+
+                    $queue = Craft::$app->getQueue();
+
+                    for ($x=0; $x<$variantCount; $x=$x+$this->standardLimit) {
+
+                        $queue->push(new AlgoliaChunkLoadTask([
+                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
+                            'loadRecordType' => $this->loadRecordType,
+                            'limit' => 100,
+                            'offset' => $x,
+                            'elementType' => $elementType
+                        ]));
+
+                        }
+                    }
+                break;
 
             CASE 'category':
 
@@ -185,7 +217,4 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
     {
         return Craft::t('algolia-sync', 'Algolia Sync');
     }
-
-
-
 }

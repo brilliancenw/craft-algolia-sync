@@ -26,6 +26,7 @@ use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 use brilliance\algoliasync\jobs\AlgoliaSyncTask;
 
 use Algolia\AlgoliaSearch\SearchClient;
+use craft\helpers\FileHelper;
 
 
 /**
@@ -71,7 +72,7 @@ class AlgoliaSyncService extends Component
             $algoliaConfig
         );
 
-        return $public_key ?? '';
+        return isset($public_key) ? $public_key : '';
     }
 
 
@@ -112,7 +113,13 @@ class AlgoliaSyncService extends Component
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($tag);
                 }
                 break;
+            CASE 'variant':
+                $allVariants = \craft\commerce\elements\Product::find()->typeId($sectionId)->all();
 
+                foreach ($allVariants AS $variant) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($variant);
+                }
+                break;
 
         }
     }
@@ -126,12 +133,35 @@ class AlgoliaSyncService extends Component
 
         $className = get_class($element);
 
+        AlgoliaSync::$plugin->algoliaSyncService->logger("trying to sync a ".$className, basename(__FILE__) , __LINE__);
+
+        if (isset($elementInfo['enabled']) && empty($elementInfo['enabled'])) {
+            AlgoliaSync::$plugin->algoliaSyncService->logger("This item is not enabled", basename(__FILE__) , __LINE__);
+
+            // at this point, we should remove the product from the index - we don't know if it was already there...
+            $algoliaIndex = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+
+            $queue = Craft::$app->getQueue();
+            $queue->push(new AlgoliaSyncTask([
+                'algoliaIndex' => $algoliaIndex,
+                'algoliaFunction' => 'delete',
+                'algoliaObjectID' => $element->id,
+                'algoliaRecord' => [],
+                'algoliaMessage' => "Item is not enabled, confirming it's removed from Algolia"
+            ]));
+
+            return false;
+        }
+
         SWITCH ($className) {
             CASE 'craft\elements\Entry':
             CASE 'craft\elements\Category':
             CASE 'craft\elements\Asset':
-
-                if (isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync']) && $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1) {
+                if (    isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
+                        &&
+                        $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
+                )
+                {
                     return true;
                 }
             return false;
@@ -139,6 +169,7 @@ class AlgoliaSyncService extends Component
             CASE 'craft\elements\User':
                 if (count($elementInfo['sectionId']) > 0) {
                     $userGroups = $elementInfo['sectionId'];
+
                     $syncedGroups = $algoliaSettings['algoliaElements']['user'];
 
                     foreach ($userGroups AS $userGroup) {
@@ -147,9 +178,28 @@ class AlgoliaSyncService extends Component
                         }
                     }
                 }
+
             break;
+            CASE 'craft\commerce\elements\Variant':
+
+                $myProduct = craft\commerce\elements\Product::find()->hasVariant($element)->one();
+
+                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Query - is this item enabled? ".$myProduct->enabled, basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("is this VARIANT enabled? ".$element->enabled, basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Type? ".$myProduct->type, basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($myProduct, true), basename(__FILE__) , __LINE__);
+
+                if (
+                    isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
+                    &&
+                    $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
+                )
+                {
+                    return true;
+                }
+                return false;
         }
-        
+
         return false;
     }
 
@@ -174,7 +224,7 @@ class AlgoliaSyncService extends Component
                 'algoliaMessage' => $queueMessage
             ]));
         }
-        Craft::info($message, 'algolia-sync');
+        AlgoliaSync::$plugin->algoliaSyncService->logger($message, basename(__FILE__) , __LINE__);
     }
 
     public function algoliaResetIndex($index) {
@@ -346,7 +396,10 @@ class AlgoliaSyncService extends Component
         // do we update this type of element?
         $recordUpdate = array();
 
-        if (AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element)) {
+        $okayToSync = AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element);
+
+        if ($okayToSync) {
+            AlgoliaSync::$plugin->algoliaSyncService->logger("We are going to sync", basename(__FILE__) , __LINE__);
 
             // what type of element
             // user, entry, category
@@ -361,7 +414,6 @@ class AlgoliaSyncService extends Component
                     $algoliaAction = 'delete';
                 }
             }
-
             // get the attributes of the entity
             $recordUpdate['attributes']['objectID'] = (int)$element->id;
             $recordUpdate['attributes']['message'] = (int)$element->id;
@@ -376,18 +428,28 @@ class AlgoliaSyncService extends Component
                 $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
             }
 
-            $fields = $element->getFieldLayout()->getFields();
+            if (!empty($element->product)) {
+                $fields = $element->product->getFieldLayout()->getFields();
+            }
+            else {
+                $fields = $element->getFieldLayout()->getFields();
+            }
 
             $arrayFieldTypes = array('entries','tags','users');
 
             foreach ($fields AS $field) {
-
                 $fieldHandle = $field->handle;
 
                 // send this off to a function to extract the specific information
                 // based on what type of field it is (asset, text, varchar, etc...)
                 $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
-                $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
+
+                if ($element->product) {
+                    $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element->product, $field, $fieldHandle);
+                }
+                else {
+                    $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
+                }
 
                 if (isset($rawData['type']) && in_array($rawData['type'],$arrayFieldTypes)) {
                     $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
@@ -431,7 +493,6 @@ class AlgoliaSyncService extends Component
                     $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
                     $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
                 }
-
             }
 
             $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
@@ -444,6 +505,7 @@ class AlgoliaSyncService extends Component
                 case 'entry':
                 case 'asset':
                 case 'tag':
+
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
@@ -463,6 +525,35 @@ class AlgoliaSyncService extends Component
                     }
                     $recordUpdate['attributes']['userGroups'] = $groupList;
                     break;
+                case 'variant':
+
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Variant Info -----", basename(__FILE__) , __LINE__);
+                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element,true), basename(__FILE__) , __LINE__);
+
+                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
+                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
+                    $recordUpdate['attributes']['title'] = $element->title;
+                    if (!empty($element->SKU)) {
+                        $recordUpdate['attributes']['SKU'] = $element->sku;
+                    }
+                    if (!empty($element->ProductType)) {
+                        $recordUpdate['attributes']['ProductType'] = $element->ProductType;
+                    }
+                    $recordUpdate['attributes']['isDefault'] = (bool)$element->isDefault;
+                    $recordUpdate['attributes']['price'] = (float)$element->price;
+                    $recordUpdate['attributes']['sortOrder'] = $element->sortOrder;
+                    $recordUpdate['attributes']['width'] = $element->width;
+                    $recordUpdate['attributes']['height'] = $element->height;
+                    $recordUpdate['attributes']['length'] = $element->length;
+                    $recordUpdate['attributes']['weight'] = $element->weight;
+                    $recordUpdate['attributes']['stock'] = (float)$element->stock;
+                    $recordUpdate['attributes']['hasUnlimitedStock'] = (bool)$element->hasUnlimitedStock;
+                    $recordUpdate['attributes']['minQty'] = (float)$element->minQty;
+                    $recordUpdate['attributes']['maxQty'] = (float)$element->maxQty;
+
+
+                    break;
+
             }
 
             // Fire event for tracking before the sync event.
@@ -476,6 +567,9 @@ class AlgoliaSyncService extends Component
 
 
             AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord($algoliaAction, $recordUpdate, $algoliaMessage);
+        }
+        else {
+            AlgoliaSync::$plugin->algoliaSyncService->logger("Not okay to sync...", basename(__FILE__) , __LINE__);
         }
     }
 
@@ -496,6 +590,21 @@ class AlgoliaSyncService extends Component
         $info['sectionId'] = [];
 
         switch ($info['type']) {
+            case 'variant':
+                $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
+
+                if ($commercePlugin) {
+                    $productTypeHandle = $commercePlugin::getInstance()->getProductTypes()->getProductTypeById($element->product->typeId)->handle;
+                    $info['sectionHandle'][] = $productTypeHandle;
+                    $info['sectionId'][] = $element->product->typeId;
+                    $info['enabled'] = $element->product->enabled;
+//                    AlgoliaSync::$plugin->algoliaSyncService->logger("-----------------------------------------", basename(__FILE__) , __LINE__);
+//                    AlgoliaSync::$plugin->algoliaSyncService->logger("Info about this record:", basename(__FILE__) , __LINE__);
+//                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element->title, true), basename(__FILE__) , __LINE__);
+//                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($info, true), basename(__FILE__) , __LINE__);
+//                    AlgoliaSync::$plugin->algoliaSyncService->logger("-----------------------------------------", basename(__FILE__) , __LINE__);
+                }
+                break;
             case 'asset':
                 $info['sectionHandle'][] = $element->volume->handle;
                 $info['sectionId'][] = $element->volume->id;
@@ -521,34 +630,39 @@ class AlgoliaSyncService extends Component
                 // this will get the current user's groups (may be multiple indexes to update)
                 // lets only upsert records that match the configured groups in algolia sync
                 $algoliaSettings = AlgoliaSync::$plugin->getSettings();
-                $syncedGroups = $algoliaSettings['algoliaElements']['user'];
 
-                $userGroups = Craft::$app->userGroups->getGroupsByUserId($element->id);
-                $deleteFromAlgolia = true;
+                if (!empty($algoliaSettings['algoliaElements']['user'])) {
+                    $syncedGroups = $algoliaSettings['algoliaElements']['user'];
 
-                foreach ($userGroups AS $group) {
-                    if (isset($syncedGroups[$group->id]) && $syncedGroups[$group->id]['sync'] == 1) {
-                        $info['sectionHandle'][] = $group->handle;
-                        $info['sectionId'][] = $group->id;
-                        $deleteFromAlgolia = false;
+                    $userGroups = Craft::$app->userGroups->getGroupsByUserId($element->id);
+                    $deleteFromAlgolia = true;
+
+                    foreach ($userGroups AS $group) {
+                        if (isset($syncedGroups[$group->id]) && $syncedGroups[$group->id]['sync'] == 1) {
+                            $info['sectionHandle'][] = $group->handle;
+                            $info['sectionId'][] = $group->id;
+                            $deleteFromAlgolia = false;
+                        }
+                    }
+                    // there doesn't seem to be a way to see what group the user WAS in,
+                    // so we need to purge them from all groups they are NOT in now.
+                    // check that this user is NOT in Algolia any more
+                    // if their user group used to match, but it's been changed
+                    // and they need to be removed...
+                    // this is where we send a quick message to Algolia to purge out their record
+
+                    if ($deleteFromAlgolia && $processRecords) {
+                        $elementData = [];
+                        $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+                        $elementData['attributes'] = [];
+                        $elementData['attributes']['objectID'] = $element->id;
+
+                        AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord('delete', $elementData);
                     }
                 }
 
-                // there doesn't seem to be a way to see what group the user WAS in,
-                // so we need to purge them from all groups they are NOT in now.
-                // check that this user is NOT in Algolia any more
-                // if their user group used to match, but it's been changed
-                // and they need to be removed...
-                // this is where we send a quick message to Algolia to purge out their record
 
-                if ($deleteFromAlgolia && $processRecords) {
-                    $elementData = [];
-                    $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
-                    $elementData['attributes'] = [];
-                    $elementData['attributes']['objectID'] = $element->id;
 
-                    AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord('delete', $elementData);
-                }
                 break;
         }
         return $info;
@@ -661,13 +775,38 @@ class AlgoliaSyncService extends Component
             );
         }
 
-        return [
-            ['label' => 'Entries',          'handle' => 'entry',            'data' => $entriesConfig],
-            ['label' => 'Asset Volumes',    'handle' => 'asset',            'data' => $volumesConfig],
-            ['label' => 'Categories',       'handle' => 'category',         'data' => $categoriesConfig],
-            ['label' => 'User Groups',      'handle' => 'user',             'data' => $userGroupsConfig],
-            ['label' => 'Tag Groups',       'handle' => 'tag',              'data' => $tagGroupsConfig]
-        ];
+        $returnArray = [];
+
+        $returnArray[] =    ['label' => 'Entries',          'handle' => 'entry',    'data' => $entriesConfig];
+        $returnArray[] =    ['label' => 'Asset Volumes',    'handle' => 'asset',    'data' => $volumesConfig];
+        $returnArray[] =    ['label' => 'Categories',       'handle' => 'category', 'data' => $categoriesConfig];
+        $returnArray[] =    ['label' => 'User Groups',      'handle' => 'user',     'data' => $userGroupsConfig];
+        $returnArray[] =    ['label' => 'Tag Groups',       'handle' => 'tag',      'data' => $tagGroupsConfig];
+
+        $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
+
+        if ($commercePlugin) {
+
+            $productTypes = $commercePlugin::getInstance()->getProductTypes()->getAllProductTypes();;
+
+            $productTypesConfig = [];
+            foreach ($productTypes AS $productType) {
+                $productTypesConfig[] = array(
+                    'default_index' => $env.'_variant_'.$productType->handle,
+                    'label' => $productType->name,
+                    'handle' => $productType->handle,
+                    'value' => $productType->id
+                );
+            }
+            $returnArray[] =     [
+                'label' => 'Commerce Product Types',
+                'handle' => 'variant',
+                'data' => $productTypesConfig
+            ];
+        }
+
+        return $returnArray;
+
     }
 
     public function getEnvironment() {
@@ -680,5 +819,12 @@ class AlgoliaSyncService extends Component
         else {
             return 'site';
         }
+    }
+
+    // AlgoliaSync::$plugin->algoliaSyncService->logger($message, __FILE__, __LINE__)
+    public function logger($message, $filename, $linenumber) {
+        $file = Craft::getAlias('@storage/logs/algolia-sync.log');
+        $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
+        FileHelper::writeToFile($file, $log, ['append' => true]);
     }
 }
