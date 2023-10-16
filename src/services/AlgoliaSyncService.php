@@ -597,12 +597,9 @@ class AlgoliaSyncService extends Component
                     $productTypeHandle = $commercePlugin::getInstance()->getProductTypes()->getProductTypeById($element->product->typeId)->handle;
                     $info['sectionHandle'][] = $productTypeHandle;
                     $info['sectionId'][] = $element->product->typeId;
+
+                    ## TODO: Add "enabled" support for other element types (assets, categories, entries, tags, users)
                     $info['enabled'] = $element->product->enabled;
-//                    AlgoliaSync::$plugin->algoliaSyncService->logger("-----------------------------------------", basename(__FILE__) , __LINE__);
-//                    AlgoliaSync::$plugin->algoliaSyncService->logger("Info about this record:", basename(__FILE__) , __LINE__);
-//                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element->title, true), basename(__FILE__) , __LINE__);
-//                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($info, true), basename(__FILE__) , __LINE__);
-//                    AlgoliaSync::$plugin->algoliaSyncService->logger("-----------------------------------------", basename(__FILE__) , __LINE__);
                 }
                 break;
             case 'asset':
