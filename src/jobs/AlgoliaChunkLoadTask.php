@@ -79,6 +79,8 @@ class AlgoliaChunkLoadTask extends BaseJob
     {
         // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
 
+        Craft::info("Executing the Queue", "algolia-sync");
+
         // as an example, you would receive one of the rows below
         //[0] => [entry][1]
         //[1] => [entry][6]
@@ -91,6 +93,34 @@ class AlgoliaChunkLoadTask extends BaseJob
         $limitCount = $this->limit;
 
         SWITCH ($elementType) {
+
+            CASE 'variant':
+
+                AlgoliaSync::$plugin->algoliaSyncService->logger("loading a chunck of variants into the Algolia sync queue", basename(__FILE__) , __LINE__);
+
+                $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
+
+                if ($commercePlugin) {
+
+                    $variants = \craft\commerce\elements\Variant::find()->typeId($sectionId)->status('enabled')->all();
+
+                    $recordCount = count($variants);
+
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Now loading ".$recordCount." products to be synced", basename(__FILE__) , __LINE__);
+
+                    $currentLoopCount = 0;
+                    foreach ($variants as $variant) {
+                        $progress = $currentLoopCount / $recordCount;
+                        $this->setProgress($queue, $progress);
+
+                        AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($variant, true), basename(__FILE__) , __LINE__);
+
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($variant);
+                        $currentLoopCount++;
+                    }
+                }
+                break;
+
             CASE 'entry':
 
                 // loading too many causes a timeout and memory issue...
