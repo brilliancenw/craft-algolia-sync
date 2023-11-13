@@ -81,6 +81,8 @@ class AlgoliaChunkLoadTask extends BaseJob
 
         Craft::info("Executing the Queue", "algolia-sync");
 
+        AlgoliaSync::$plugin->algoliaSyncService->logger("Create a chunck load task", basename(__FILE__) , __LINE__);
+
         // as an example, you would receive one of the rows below
         //[0] => [entry][1]
         //[1] => [entry][6]

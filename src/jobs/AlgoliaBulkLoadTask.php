@@ -148,7 +148,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 
                     for ($x=0; $x<$variantCount; $x=$x+$this->standardLimit) {
                         $queue->push(new AlgoliaChunkLoadTask([
-                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of '.$this->loadRecordType.' records to process start ('.$x.') limit ('.$this->standardLimit.')'),
+                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of '.$elementType.' records to process start ('.$x.') limit ('.$this->standardLimit.')'),
                             'loadRecordType' => $this->loadRecordType,
                             'limit' => $this->standardLimit,
                             'offset' => $x,
@@ -156,6 +156,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                             ]));
                         }
                     }
+                AlgoliaSync::$plugin->algoliaSyncService->logger("finished AlgoliaBulkLoadTask", basename(__FILE__) , __LINE__);
                 break;
 
             CASE 'category':
