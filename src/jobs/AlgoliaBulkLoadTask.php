@@ -124,7 +124,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                     $queue->push(new AlgoliaChunkLoadTask([
                         'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
                         'loadRecordType' => $this->loadRecordType,
-                        'limit' => 100,
+                        'limit' => $this->standardLimit,
                         'offset' => $x,
                         'elementType' => $elementType
                     ]));
@@ -141,20 +141,19 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 
                 if ($commercePlugin) {
 
+                    // this is the total number of variants in the system
                     $variantCount = \craft\commerce\elements\Variant::find()->typeId($sectionId)->count();
 
                     $queue = Craft::$app->getQueue();
 
                     for ($x=0; $x<$variantCount; $x=$x+$this->standardLimit) {
-
                         $queue->push(new AlgoliaChunkLoadTask([
-                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
+                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of '.$this->loadRecordType.' records to process start ('.$x.') limit ('.$this->standardLimit.')'),
                             'loadRecordType' => $this->loadRecordType,
-                            'limit' => 100,
+                            'limit' => $this->standardLimit,
                             'offset' => $x,
                             'elementType' => $elementType
-                        ]));
-
+                            ]));
                         }
                     }
                 break;
@@ -185,8 +184,6 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 $queue = Craft::$app->getQueue();
 
                 for ($x=0; $x<$userCount; $x=$x+$this->standardLimit) {
-                    print_r('count: '.$x);
-
                     $progress = $x / $this->standardLimit;
                     $this->setProgress($queue, $progress);
 

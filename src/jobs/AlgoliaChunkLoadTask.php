@@ -96,7 +96,7 @@ class AlgoliaChunkLoadTask extends BaseJob
 
             CASE 'variant':
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("loading a chunk of product variants into the Algolia sync queue", basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("loading a chunk of product variants (with type ID = ".$sectionId.") into the Algolia sync queue.  OffsetCount=".$offsetCount.", limitCount=".$limitCount, basename(__FILE__) , __LINE__);
 
                 $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
 
@@ -106,14 +106,14 @@ class AlgoliaChunkLoadTask extends BaseJob
                     $variants = \craft\commerce\elements\Variant::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->all();
 
                     if ($recordCount > 0) {
-                        AlgoliaSync::$plugin->algoliaSyncService->logger("Now loading ".$recordCount." products to be synced", basename(__FILE__) , __LINE__);
+                        AlgoliaSync::$plugin->algoliaSyncService->logger("We found ".$recordCount." products that need to be synced in this batch to be synced", basename(__FILE__) , __LINE__);
 
                         $currentLoopCount = 0;
                         foreach ($variants as $variant) {
                             $progress = $currentLoopCount / $recordCount;
                             $this->setProgress($queue, $progress);
 
-                            AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($variant, true), basename(__FILE__) , __LINE__);
+                            // AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($variant, true), basename(__FILE__) , __LINE__);
 
                             AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($variant);
                             $currentLoopCount++;
