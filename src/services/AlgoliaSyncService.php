@@ -187,7 +187,7 @@ class AlgoliaSyncService extends Component
                 AlgoliaSync::$plugin->algoliaSyncService->logger("Product Query - is this item enabled? ".$myProduct->enabled, basename(__FILE__) , __LINE__);
                 AlgoliaSync::$plugin->algoliaSyncService->logger("is this VARIANT enabled? ".$element->enabled, basename(__FILE__) , __LINE__);
                 AlgoliaSync::$plugin->algoliaSyncService->logger("Product Type? ".$myProduct->type, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($myProduct, true), basename(__FILE__) , __LINE__);
+                // AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($myProduct, true), basename(__FILE__) , __LINE__);
 
                 if (
                     isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
@@ -527,8 +527,8 @@ class AlgoliaSyncService extends Component
                     break;
                 case 'variant':
 
-                    AlgoliaSync::$plugin->algoliaSyncService->logger("Variant Info -----", basename(__FILE__) , __LINE__);
-                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element,true), basename(__FILE__) , __LINE__);
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Variant is being loaded", basename(__FILE__) , __LINE__);
+                    // AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element,true), basename(__FILE__) , __LINE__);
 
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
