@@ -144,6 +144,8 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                     // this is the total number of variants in the system
                     $variantCount = \craft\commerce\elements\Variant::find()->typeId($sectionId)->count();
 
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("there are ".$variantCount." products to load who match sectionId: ".$sectionId, basename(__FILE__) , __LINE__);
+
                     $queue = Craft::$app->getQueue();
 
                     for ($x=0; $x<$variantCount; $x=$x+$this->standardLimit) {

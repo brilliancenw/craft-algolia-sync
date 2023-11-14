@@ -182,12 +182,11 @@ class AlgoliaSyncService extends Component
             break;
             CASE 'craft\commerce\elements\Variant':
 
-                $myProduct = craft\commerce\elements\Product::find()->hasVariant($element)->one();
+                // the product query requires the results of a Variant query (can't just use the Variant itself)
+                $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
+                $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Query - is this item enabled? ".$myProduct->enabled, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger("is this VARIANT enabled? ".$element->enabled, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Type? ".$myProduct->type, basename(__FILE__) , __LINE__);
-                // AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($myProduct, true), basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$myProduct->title, basename(__FILE__) , __LINE__);
 
                 if (
                     isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
