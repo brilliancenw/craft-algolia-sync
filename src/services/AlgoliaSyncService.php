@@ -820,8 +820,10 @@ class AlgoliaSyncService extends Component
 
     // AlgoliaSync::$plugin->algoliaSyncService->logger($message, __FILE__, __LINE__)
     public function logger($message, $filename, $linenumber) {
-        $file = Craft::getAlias('@storage/logs/algolia-sync.log');
-        $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
-        FileHelper::writeToFile($file, $log, ['append' => true]);
+        if (Craft::$app->getConfig()->general->devMode) {
+            $file = Craft::getAlias('@storage/logs/algolia-sync.log');
+            $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
+            FileHelper::writeToFile($file, $log, ['append' => true]);
+        }
     }
 }
