@@ -186,7 +186,7 @@ class AlgoliaSyncService extends Component
                 $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
                 $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$myProduct->title, basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$myProduct->title.", Product ID: ".$myProduct->id, basename(__FILE__) , __LINE__);
 
                 if (
                     isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
@@ -527,8 +527,13 @@ class AlgoliaSyncService extends Component
                 case 'variant':
 
                     AlgoliaSync::$plugin->algoliaSyncService->logger("Variant is being loaded", basename(__FILE__) , __LINE__);
-                    // AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element,true), basename(__FILE__) , __LINE__);
 
+                    $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
+                    $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
+
+                    // lets get the product id and the sale price of the product...
+
+                    $recordUpdate['productId'] = $myProduct->id;
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
@@ -540,6 +545,7 @@ class AlgoliaSyncService extends Component
                     }
                     $recordUpdate['attributes']['isDefault'] = (bool)$element->isDefault;
                     $recordUpdate['attributes']['price'] = (float)$element->price;
+                    $recordUpdate['attributes']['salePrice'] = (float)$element->salePrice;
                     $recordUpdate['attributes']['sortOrder'] = $element->sortOrder;
                     $recordUpdate['attributes']['width'] = $element->width;
                     $recordUpdate['attributes']['height'] = $element->height;
