@@ -529,14 +529,13 @@ class AlgoliaSyncService extends Component
                     AlgoliaSync::$plugin->algoliaSyncService->logger("Variant is being loaded", basename(__FILE__) , __LINE__);
 
                     $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
+                    // pulling the product allows us to get the product id to add to the variant info
                     $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
-                    // lets get the product id and the sale price of the product...
-
-                    $recordUpdate['productId'] = $myProduct->id;
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
+                    $recordUpdate['attributes']['productId'] = $myProduct->id;
                     if (!empty($element->SKU)) {
                         $recordUpdate['attributes']['SKU'] = $element->sku;
                     }
@@ -556,10 +555,9 @@ class AlgoliaSyncService extends Component
                     $recordUpdate['attributes']['minQty'] = (float)$element->minQty;
                     $recordUpdate['attributes']['maxQty'] = (float)$element->maxQty;
 
-
                     break;
 
-            }
+                }
 
             // Fire event for tracking before the sync event.
             $event = new beforeAlgoliaSyncEvent([
