@@ -542,6 +542,7 @@ class AlgoliaSyncService extends Component
                     if (!empty($element->ProductType)) {
                         $recordUpdate['attributes']['ProductType'] = $element->ProductType;
                     }
+                    $recordUpdate['attributes']['availableForPurchase'] = (bool)$myProduct->availableForPurchase;
                     $recordUpdate['attributes']['isDefault'] = (bool)$element->isDefault;
                     $recordUpdate['attributes']['price'] = (float)$element->price;
                     $recordUpdate['attributes']['salePrice'] = (float)$element->salePrice;
@@ -554,7 +555,7 @@ class AlgoliaSyncService extends Component
                     $recordUpdate['attributes']['hasUnlimitedStock'] = (bool)$element->hasUnlimitedStock;
                     $recordUpdate['attributes']['minQty'] = (float)$element->minQty;
                     $recordUpdate['attributes']['maxQty'] = (float)$element->maxQty;
-
+                    
                     break;
 
                 }
