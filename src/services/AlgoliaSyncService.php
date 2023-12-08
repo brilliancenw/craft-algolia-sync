@@ -532,16 +532,19 @@ class AlgoliaSyncService extends Component
                 // this will get the current user's groups (may be multiple indexes to update)
                 // lets only upsert records that match the configured groups in algolia sync
                 $algoliaSettings = AlgoliaSync::$plugin->getSettings();
-                $syncedGroups = $algoliaSettings['algoliaElements']['user'];
 
-                $userGroups = Craft::$app->userGroups->getGroupsByUserId($element->id);
-                $deleteFromAlgolia = true;
-
-                foreach ($userGroups AS $group) {
-                    if (isset($syncedGroups[$group->id]) && $syncedGroups[$group->id]['sync'] == 1) {
-                        $info['sectionHandle'][] = $group->handle;
-                        $info['sectionId'][] = $group->id;
-                        $deleteFromAlgolia = false;
+                if (isset($algoliaSettings['algoliaElements']['user'])) {
+                    $syncedGroups = $algoliaSettings['algoliaElements']['user'];
+    
+                    $userGroups = Craft::$app->userGroups->getGroupsByUserId($element->id);
+                    $deleteFromAlgolia = true;
+    
+                    foreach ($userGroups AS $group) {
+                        if (isset($syncedGroups[$group->id]) && $syncedGroups[$group->id]['sync'] == 1) {
+                            $info['sectionHandle'][] = $group->handle;
+                            $info['sectionId'][] = $group->id;
+                            $deleteFromAlgolia = false;
+                        }
                     }
                 }
 
