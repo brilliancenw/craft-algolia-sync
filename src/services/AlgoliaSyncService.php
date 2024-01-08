@@ -186,15 +186,18 @@ class AlgoliaSyncService extends Component
                 $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
                 $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$myProduct->title.", Product ID: ".$myProduct->id, basename(__FILE__) , __LINE__);
-
-                if (
-                    isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
-                    &&
-                    $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
-                )
-                {
-                    return true;
+                if (!empty($myProduct)) {
+                    
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$myProduct->title.", Product ID: ".$myProduct->id, basename(__FILE__) , __LINE__);
+    
+                    if (
+                        isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
+                        &&
+                        $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
+                    )
+                    {
+                        return true;
+                    }
                 }
                 return false;
         }
