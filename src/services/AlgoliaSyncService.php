@@ -182,20 +182,22 @@ class AlgoliaSyncService extends Component
             break;
             CASE 'craft\commerce\elements\Variant':
 
-                $myProduct = craft\commerce\elements\Product::find()->hasVariant($element)->one();
+                // the product query requires the results of a Variant query (can't just use the Variant itself)
+                $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
+                $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Query - is this item enabled? ".$myProduct->enabled, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger("is this VARIANT enabled? ".$element->enabled, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Type? ".$myProduct->type, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($myProduct, true), basename(__FILE__) , __LINE__);
-
-                if (
-                    isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
-                    &&
-                    $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
-                )
-                {
-                    return true;
+                if (!empty($myProduct)) {
+                    
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$myProduct->title.", Product ID: ".$myProduct->id, basename(__FILE__) , __LINE__);
+    
+                    if (
+                        isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
+                        &&
+                        $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
+                    )
+                    {
+                        return true;
+                    }
                 }
                 return false;
         }
@@ -527,20 +529,26 @@ class AlgoliaSyncService extends Component
                     break;
                 case 'variant':
 
-                    AlgoliaSync::$plugin->algoliaSyncService->logger("Variant Info -----", basename(__FILE__) , __LINE__);
-                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element,true), basename(__FILE__) , __LINE__);
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Variant is being loaded", basename(__FILE__) , __LINE__);
+
+                    $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
+                    // pulling the product allows us to get the product id to add to the variant info
+                    $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
                     $recordUpdate['handle'] = $elementInfo['sectionHandle'];
                     $recordUpdate['attributes']['title'] = $element->title;
+                    $recordUpdate['attributes']['productId'] = $myProduct->id;
                     if (!empty($element->SKU)) {
                         $recordUpdate['attributes']['SKU'] = $element->sku;
                     }
                     if (!empty($element->ProductType)) {
                         $recordUpdate['attributes']['ProductType'] = $element->ProductType;
                     }
+                    $recordUpdate['attributes']['availableForPurchase'] = (bool)$myProduct->availableForPurchase;
                     $recordUpdate['attributes']['isDefault'] = (bool)$element->isDefault;
                     $recordUpdate['attributes']['price'] = (float)$element->price;
+                    $recordUpdate['attributes']['salePrice'] = (float)$element->salePrice;
                     $recordUpdate['attributes']['sortOrder'] = $element->sortOrder;
                     $recordUpdate['attributes']['width'] = $element->width;
                     $recordUpdate['attributes']['height'] = $element->height;
@@ -550,11 +558,10 @@ class AlgoliaSyncService extends Component
                     $recordUpdate['attributes']['hasUnlimitedStock'] = (bool)$element->hasUnlimitedStock;
                     $recordUpdate['attributes']['minQty'] = (float)$element->minQty;
                     $recordUpdate['attributes']['maxQty'] = (float)$element->maxQty;
-
-
+                    
                     break;
 
-            }
+                }
 
             // Fire event for tracking before the sync event.
             $event = new beforeAlgoliaSyncEvent([
@@ -820,8 +827,10 @@ class AlgoliaSyncService extends Component
 
     // AlgoliaSync::$plugin->algoliaSyncService->logger($message, __FILE__, __LINE__)
     public function logger($message, $filename, $linenumber) {
-        $file = Craft::getAlias('@storage/logs/algolia-sync.log');
-        $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
-        FileHelper::writeToFile($file, $log, ['append' => true]);
+        if (Craft::$app->getConfig()->general->devMode) {
+            $file = Craft::getAlias('@storage/logs/algolia-sync.log');
+            $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
+            FileHelper::writeToFile($file, $log, ['append' => true]);
+        }
     }
 }
