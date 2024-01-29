@@ -669,7 +669,7 @@ class AlgoliaSyncService extends Component
                         $variantInfo['weight'] = (float)$variantDetails->weight;
                         $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
                         $variantInfo['minQty'] = (int)$variantDetails->minQty;
-                        $variantInfo['minQty'] = (int)$variantDetails->minQty;
+                        $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
 
                         // nest each variant under the product info
                         $recordUpdate['attributes']['variants'][] = $variantInfo;

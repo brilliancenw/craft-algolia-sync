@@ -96,28 +96,26 @@ class AlgoliaChunkLoadTask extends BaseJob
 
         SWITCH ($elementType) {
 
-            CASE 'variant':
+            CASE 'product':
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("loading a chunk of product variants (with type ID = ".$sectionId.") into the Algolia sync queue.  OffsetCount=".$offsetCount.", limitCount=".$limitCount, basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("loading a chunk of products (with type ID = ".$sectionId.") into the Algolia sync queue.  OffsetCount=".$offsetCount.", limitCount=".$limitCount, basename(__FILE__) , __LINE__);
 
                 $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
 
                 if ($commercePlugin) {
 
-                    $recordCount = \craft\commerce\elements\Variant::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->count();
-                    $variants = \craft\commerce\elements\Variant::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->all();
+                    $recordCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->count();
+                    $products = \craft\commerce\elements\Product::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->all();
 
                     if ($recordCount > 0) {
                         AlgoliaSync::$plugin->algoliaSyncService->logger("We found ".$recordCount." products that need to be synced in this batch to be synced", basename(__FILE__) , __LINE__);
 
                         $currentLoopCount = 0;
-                        foreach ($variants as $variant) {
+                        foreach ($products as $product) {
                             $progress = $currentLoopCount / $recordCount;
                             $this->setProgress($queue, $progress);
 
-                            // AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($variant, true), basename(__FILE__) , __LINE__);
-
-                            AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($variant);
+                            AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($product);
                             $currentLoopCount++;
                         }
                     }
