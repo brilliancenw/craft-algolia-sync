@@ -628,6 +628,17 @@ class AlgoliaSyncService extends Component
 
                 case 'product':
 
+                    $defaultVariant = $element->defaultVariant;
+
+                    if ($defaultVariant->onSale) {
+                        $salePrice = (float)$defaultVariant->salePrice;
+                        $onSale = true;
+                    }
+                    else {
+                        $salePrice = null;
+                        $onSale = false;
+                    }
+
                     AlgoliaSync::$plugin->algoliaSyncService->logger("Product is being loaded", basename(__FILE__) , __LINE__);
 
                     // get the basic product info
@@ -643,6 +654,8 @@ class AlgoliaSyncService extends Component
                     $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
                     $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
                     $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
+                    $recordUpdate['attributes']['onSale'] = $onSale;
+                    $recordUpdate['attributes']['salePrice'] = $salePrice;
                     $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
                     $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
                     $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
