@@ -714,6 +714,50 @@ class AlgoliaSyncService extends Component
         return str_replace(' ', '_', $fieldName);
     }
 
+    public function getSyncedMemberGroups() {
+        // this is used when deleting a user record
+        // as Craft doesn't give us what groups they "used to be" in
+        // when a record gets updated.  If they are not part of any group,
+        // we need to actively delete them from any member group that is being synced
+
+        $env = $this->getEnvironment();
+
+        // user groups list
+        $userGroups = Craft::$app->userGroups->getAllGroups();
+        $userGroupsConfig = [];
+        foreach ($userGroups AS $group) {
+            $userGroupsConfig[$group->id] = $env.'_user_'.$group->handle;
+        }
+
+        $syncedGroups = [];
+
+        $algoliaSettings = AlgoliaSync::$plugin->getSettings();
+
+        if (isset($algoliaSettings->algoliaElements['user'])) {
+            $syncedGroupsArray = $algoliaSettings->algoliaElements['user'];
+            if (count($syncedGroupsArray) > 0) {
+                foreach ($syncedGroupsArray AS $groupId => $groupData) {
+                    if (!empty($groupData['sync'])) {
+                        // does this have a custom index name?
+                        $potentialIndexOverride = $groupData['customIndex'];
+
+                        if (!empty($potentialIndexOverride)) {
+                            // is that name an env variable?
+                            $syncedGroups[] = App::parseEnv($potentialIndexOverride);
+                        }
+                        else {
+                            // otherwise, use the default convention
+                            if (isset($userGroupsConfig[$groupId])) {
+                                $syncedGroups[] = $userGroupsConfig[$groupId];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $syncedGroups;
+    }
+
     public function getEventElementInfo($element, $processRecords = true) {
 
         $elementTypeSlugArray = explode("\\", get_class($element));
@@ -785,8 +829,9 @@ class AlgoliaSyncService extends Component
                     // this is where we send a quick message to Algolia to purge out their record
 
                     if ($deleteFromAlgolia && $processRecords) {
+
                         $elementData = [];
-                        $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+                        $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getSyncedMemberGroups();
                         $elementData['attributes'] = [];
                         $elementData['attributes']['objectID'] = $element->id;
 
