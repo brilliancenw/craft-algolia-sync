@@ -124,7 +124,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                     $queue->push(new AlgoliaChunkLoadTask([
                         'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
                         'loadRecordType' => $this->loadRecordType,
-                        'limit' => 100,
+                        'limit' => $this->standardLimit,
                         'offset' => $x,
                         'elementType' => $elementType
                     ]));
@@ -132,7 +132,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 
             break;
 
-            CASE 'variant':
+            CASE 'product':
 
                 // loading too many causes a timeout and memory issue...
                 // breaking these updates into 100 record chunks
@@ -141,22 +141,24 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 
                 if ($commercePlugin) {
 
-                    $variantCount = \craft\commerce\elements\Variant::find()->typeId($sectionId)->count();
+                    // this is the total number of variants in the system
+                    $productCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->count();
+
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("there are ".$productCount." products to load who match sectionId: ".$sectionId, basename(__FILE__) , __LINE__);
 
                     $queue = Craft::$app->getQueue();
 
-                    for ($x=0; $x<$variantCount; $x=$x+$this->standardLimit) {
-
+                    for ($x=0; $x<$productCount; $x=$x+$this->standardLimit) {
                         $queue->push(new AlgoliaChunkLoadTask([
-                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
+                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of '.$elementType.' records to process start ('.$x.') limit ('.$this->standardLimit.')'),
                             'loadRecordType' => $this->loadRecordType,
-                            'limit' => 100,
+                            'limit' => $this->standardLimit,
                             'offset' => $x,
                             'elementType' => $elementType
-                        ]));
-
+                            ]));
                         }
                     }
+                AlgoliaSync::$plugin->algoliaSyncService->logger("finished AlgoliaBulkLoadTask", basename(__FILE__) , __LINE__);
                 break;
 
             CASE 'category':
@@ -185,8 +187,6 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 $queue = Craft::$app->getQueue();
 
                 for ($x=0; $x<$userCount; $x=$x+$this->standardLimit) {
-                    print_r('count: '.$x);
-
                     $progress = $x / $this->standardLimit;
                     $this->setProgress($queue, $progress);
 

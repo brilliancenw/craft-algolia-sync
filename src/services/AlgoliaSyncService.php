@@ -113,11 +113,11 @@ class AlgoliaSyncService extends Component
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($tag);
                 }
                 break;
-            CASE 'variant':
-                $allVariants = \craft\commerce\elements\Product::find()->typeId($sectionId)->all();
+            CASE 'product':
+                $allProductTypes = \craft\commerce\elements\Product::find()->typeId($sectionId)->all();
 
-                foreach ($allVariants AS $variant) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($variant);
+                foreach ($allProductTypes AS $productType) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($productType);
                 }
                 break;
 
@@ -158,13 +158,13 @@ class AlgoliaSyncService extends Component
             CASE 'craft\elements\Category':
             CASE 'craft\elements\Asset':
                 if (    isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
-                        &&
-                        $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
+                    &&
+                    $algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'] == 1
                 )
                 {
                     return true;
                 }
-            return false;
+                return false;
 
             CASE 'craft\elements\User':
                 if (count($elementInfo['sectionId']) > 0) {
@@ -179,15 +179,14 @@ class AlgoliaSyncService extends Component
                     }
                 }
 
-            break;
-            CASE 'craft\commerce\elements\Variant':
+                break;
+            CASE 'craft\commerce\elements\Product':
 
-                $myProduct = craft\commerce\elements\Product::find()->hasVariant($element)->one();
+                // the product query requires the results of a Variant query (can't just use the Variant itself)
+                // $thisVariantQuery = \craft\commerce\elements\Variant::find()->id($element->id);
+                // $myProduct = craft\commerce\elements\Product::find()->hasVariant($thisVariantQuery)->one();
 
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Query - is this item enabled? ".$myProduct->enabled, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger("is this VARIANT enabled? ".$element->enabled, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Type? ".$myProduct->type, basename(__FILE__) , __LINE__);
-                AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($myProduct, true), basename(__FILE__) , __LINE__);
+                AlgoliaSync::$plugin->algoliaSyncService->logger("Product Title: ".$element->title.", Product ID: ".$element->id, basename(__FILE__) , __LINE__);
 
                 if (
                     isset($algoliaSettings['algoliaElements'][$elementInfo['type']][$elementInfo['sectionId'][0]]['sync'])
@@ -253,6 +252,90 @@ class AlgoliaSyncService extends Component
         return true;
     }
 
+    public function getCategoryTree($element, $fieldHandle, $parentCategory=null, $level=0) {
+        $level++;
+
+        /*
+(
+    [id] => 37
+    [fieldLayoutId] => 6
+    [uid] => 39811dea-f5f8-4e41-80d4-931e1068b78a
+    [enabled] => 1
+    [archived] => 0
+    [dateCreated] => 2024-01-18 20:33:40
+    [dateUpdated] => 2024-01-18 20:33:40
+    [siteSettingsId] => 37
+    [slug] => parent-1
+    [siteId] => 1
+    [uri] => categories/parent-1
+    [enabledForSite] => 1
+    [canonicalId] =>
+    [dateLastMerged] =>
+    [groupId] => 1
+    [contentId] => 36
+    [title] => Parent #1
+    [field_numberField_vqmpwqxj] =>
+    [field_textField_abzobzqy] =>
+    [root] => 1
+    [lft] => 2
+    [rgt] => 7
+    [level] => 1
+    [structureId] => 1
+)
+         */
+
+        // if this is the top level, treat it as such.
+        if ($parentCategory === null) {
+            $cats = $element->$fieldHandle
+                ->level($level)
+                ->all();
+        }
+        else {
+            $cats = $element->$fieldHandle
+                ->descendantOf($parentCategory->id)
+                ->descendantDist(1)
+                ->level($level)
+                ->all();
+
+        }
+
+        if (count($cats) == 0) {
+            return null;
+        }
+        else {
+
+            foreach ($cats AS $cat) {
+                $thisLittlePiece = [];
+                $thisLittlePiece['title'] = $cat->title;
+                $thisLittlePiece['children'] = $this->getCategoryTree($element, $fieldHandle, $cat, $level);
+
+                $thisBranch[] = $thisLittlePiece;
+            }
+        }
+
+        return $thisBranch;
+    }
+
+
+    public function convertToLevels($array, &$categories, $level = 0, $prefix = '') {
+        if (!is_array($array)) {
+            return;
+        }
+
+        foreach ($array as $element) {
+            if (isset($element['title'])) {
+                $currentTitle = $level === 0 ? $element['title'] : $prefix . ' > ' . $element['title'];
+
+                // Add the current title to the appropriate level
+                $categories['lvl' . $level][] = $currentTitle;
+
+                // If children are present, go one level deeper
+                if (isset($element['children']) && is_array($element['children'])) {
+                    $this->convertToLevels($element['children'], $categories, $level + 1, $currentTitle);
+                }
+            }
+        }
+    }
     public function getFieldData($element, $field, $fieldHandle)
     {
         $fieldTypeArray = explode('\\', get_class($field));
@@ -263,16 +346,30 @@ class AlgoliaSyncService extends Component
                 $checkValue = $element->$fieldHandle;
                 if (is_numeric($checkValue)) {
                     return (float)$element->$fieldHandle;
-                    }
+                }
                 return $element->$fieldHandle;
 
             case 'categories':
+
+                // flat categories
                 $categories = $element->$fieldHandle->all();
-                $returnCats = [];
+                $flatCats = [];
                 foreach ($categories AS $cat) {
-                    $returnCats[] = $cat->title;
+                    $flatCats[] = $cat->title;
                 }
-                return $returnCats;
+
+                // nested categories
+                $nestedCategories = $this->getCategoryTree($element,$fieldHandle);
+
+                $levelCategories = [];
+                $this->convertToLevels($nestedCategories, $levelCategories);
+
+                return array(
+                    'type' => $fieldType,
+                    'flat'   => $flatCats,
+                    'nested'    => $levelCategories
+                );
+
 
             case 'entries':
             case 'tags':
@@ -298,10 +395,10 @@ class AlgoliaSyncService extends Component
                 );
 
             case 'number':
-                    return (float)$element->$fieldHandle;
+                return (float)$element->$fieldHandle;
 
             case 'lightswitch':
-                    return (bool)$element->$fieldHandle;
+                return (bool)$element->$fieldHandle;
 
             case 'multiselect':
             case 'checkboxes':
@@ -316,7 +413,7 @@ class AlgoliaSyncService extends Component
                 }
                 return $storedOptions;
             case 'dropdown':
-                    return $element->$fieldHandle->label;
+                return $element->$fieldHandle->label;
             case 'radiobuttons':
                 return $element->$fieldHandle->value;
             case 'date':
@@ -393,6 +490,10 @@ class AlgoliaSyncService extends Component
 
     public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '') {
 
+        $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
+        $elementTypeSlug = $elementInfo['type'];
+
+        AlgoliaSync::$plugin->algoliaSyncService->logger("This type of item has been saved:: ".$elementTypeSlug, basename(__FILE__) , __LINE__);
         // do we update this type of element?
         $recordUpdate = array();
 
@@ -444,12 +545,7 @@ class AlgoliaSyncService extends Component
                 // based on what type of field it is (asset, text, varchar, etc...)
                 $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
 
-                if ($element->product) {
-                    $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element->product, $field, $fieldHandle);
-                }
-                else {
-                    $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
-                }
+                $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
 
                 if (isset($rawData['type']) && in_array($rawData['type'],$arrayFieldTypes)) {
                     $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
@@ -471,6 +567,13 @@ class AlgoliaSyncService extends Component
                         $recordUpdate['attributes']['_geoloc']['lat'] = $rawData['lat'];
                         $recordUpdate['attributes']['_geoloc']['lng'] = $rawData['lng'];
                     }
+                }
+                elseif (isset($rawData['type']) && $rawData['type'] == 'categories') {
+
+                    $recordUpdate['attributes'][$fieldName] = $rawData['flat'];
+                    $nestedName = $fieldName."_hx";
+                    $recordUpdate['attributes'][$nestedName] = $rawData['nested'];
+
                 }
                 else {
                     $recordUpdate['attributes'][$fieldName] = $rawData;
@@ -497,9 +600,6 @@ class AlgoliaSyncService extends Component
 
             $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
 
-            $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
-            $elementTypeSlug = $elementInfo['type'];
-
             switch ($elementTypeSlug) {
                 case 'category':
                 case 'entry':
@@ -525,32 +625,69 @@ class AlgoliaSyncService extends Component
                     }
                     $recordUpdate['attributes']['userGroups'] = $groupList;
                     break;
-                case 'variant':
 
-                    AlgoliaSync::$plugin->algoliaSyncService->logger("Variant Info -----", basename(__FILE__) , __LINE__);
-                    AlgoliaSync::$plugin->algoliaSyncService->logger(print_r($element,true), basename(__FILE__) , __LINE__);
+                case 'product':
 
+                    $defaultVariant = $element->defaultVariant;
+
+                    if ($defaultVariant->onSale) {
+                        $salePrice = (float)$defaultVariant->salePrice;
+                        $onSale = true;
+                    }
+                    else {
+                        $salePrice = null;
+                        $onSale = false;
+                    }
+
+                    AlgoliaSync::$plugin->algoliaSyncService->logger("Product is being loaded", basename(__FILE__) , __LINE__);
+
+                    // get the basic product info
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
-                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
+                    $recordUpdate['handle'] = $elementInfo['sectionHandle'][0];
                     $recordUpdate['attributes']['title'] = $element->title;
-                    if (!empty($element->SKU)) {
-                        $recordUpdate['attributes']['SKU'] = $element->sku;
-                    }
-                    if (!empty($element->ProductType)) {
-                        $recordUpdate['attributes']['ProductType'] = $element->ProductType;
-                    }
-                    $recordUpdate['attributes']['isDefault'] = (bool)$element->isDefault;
-                    $recordUpdate['attributes']['price'] = (float)$element->price;
-                    $recordUpdate['attributes']['sortOrder'] = $element->sortOrder;
-                    $recordUpdate['attributes']['width'] = $element->width;
-                    $recordUpdate['attributes']['height'] = $element->height;
-                    $recordUpdate['attributes']['length'] = $element->length;
-                    $recordUpdate['attributes']['weight'] = $element->weight;
-                    $recordUpdate['attributes']['stock'] = (float)$element->stock;
-                    $recordUpdate['attributes']['hasUnlimitedStock'] = (bool)$element->hasUnlimitedStock;
-                    $recordUpdate['attributes']['minQty'] = (float)$element->minQty;
-                    $recordUpdate['attributes']['maxQty'] = (float)$element->maxQty;
+                    $recordUpdate['attributes']['productId'] = $element->id;
+                    $recordUpdate['attributes']['typeId'] = $element->typeId;
+                    $recordUpdate['attributes']['taxCategoryId'] = $element->taxCategoryId;
+                    $recordUpdate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
+                    $recordUpdate['attributes']['defaultSku'] = $element->defaultSku;
+                    $recordUpdate['attributes']['ProductType'] = $elementInfo['productTypeName'];
+                    $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
+                    $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
+                    $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
+                    $recordUpdate['attributes']['onSale'] = $onSale;
+                    $recordUpdate['attributes']['salePrice'] = $salePrice;
+                    $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
+                    $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
+                    $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
+                    $recordUpdate['attributes']['defaultWeight'] = $element->defaultWeight;
+                    $recordUpdate['attributes']['taxCategory'] = $element->taxCategory;
 
+                    // now load all variants
+                    $getAllVariants = \craft\commerce\elements\Variant::find()->productId($element->id);
+
+                    $recordUpdate['attributes']['variants'] = [];
+
+                    foreach ($getAllVariants AS $variantDetails) {
+
+                        $variantInfo = [];
+                        $variantInfo['title'] = $variantDetails->title;
+                        $variantInfo['productId'] = (int)$variantDetails->productId;
+                        $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
+                        $variantInfo['price'] = (float)$variantDetails->price;
+                        $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
+                        $variantInfo['width'] = (float)$variantDetails->width;
+                        $variantInfo['height'] = (float)$variantDetails->height;
+                        $variantInfo['length'] = (float)$variantDetails->length;
+                        $variantInfo['stock'] = (int)$variantDetails->stock;
+                        $variantInfo['weight'] = (float)$variantDetails->weight;
+                        $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
+                        $variantInfo['minQty'] = (int)$variantDetails->minQty;
+                        $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
+
+                        // nest each variant under the product info
+                        $recordUpdate['attributes']['variants'][] = $variantInfo;
+
+                    }
 
                     break;
 
@@ -565,7 +702,6 @@ class AlgoliaSyncService extends Component
             $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
             $recordUpdate = $event->recordUpdate;
 
-
             AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord($algoliaAction, $recordUpdate, $algoliaMessage);
         }
         else {
@@ -576,6 +712,50 @@ class AlgoliaSyncService extends Component
     public function sanitizeFieldName($fieldName) {
         $fieldName = preg_replace("/[^A-Za-z0-9 ]/", '', $fieldName);
         return str_replace(' ', '_', $fieldName);
+    }
+
+    public function getSyncedMemberGroups() {
+        // this is used when deleting a user record
+        // as Craft doesn't give us what groups they "used to be" in
+        // when a record gets updated.  If they are not part of any group,
+        // we need to actively delete them from any member group that is being synced
+
+        $env = $this->getEnvironment();
+
+        // user groups list
+        $userGroups = Craft::$app->userGroups->getAllGroups();
+        $userGroupsConfig = [];
+        foreach ($userGroups AS $group) {
+            $userGroupsConfig[$group->id] = $env.'_user_'.$group->handle;
+        }
+
+        $syncedGroups = [];
+
+        $algoliaSettings = AlgoliaSync::$plugin->getSettings();
+
+        if (isset($algoliaSettings->algoliaElements['user'])) {
+            $syncedGroupsArray = $algoliaSettings->algoliaElements['user'];
+            if (count($syncedGroupsArray) > 0) {
+                foreach ($syncedGroupsArray AS $groupId => $groupData) {
+                    if (!empty($groupData['sync'])) {
+                        // does this have a custom index name?
+                        $potentialIndexOverride = $groupData['customIndex'];
+
+                        if (!empty($potentialIndexOverride)) {
+                            // is that name an env variable?
+                            $syncedGroups[] = App::parseEnv($potentialIndexOverride);
+                        }
+                        else {
+                            // otherwise, use the default convention
+                            if (isset($userGroupsConfig[$groupId])) {
+                                $syncedGroups[] = $userGroupsConfig[$groupId];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $syncedGroups;
     }
 
     public function getEventElementInfo($element, $processRecords = true) {
@@ -590,16 +770,16 @@ class AlgoliaSyncService extends Component
         $info['sectionId'] = [];
 
         switch ($info['type']) {
-            case 'variant':
+            case 'product':
                 $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
 
                 if ($commercePlugin) {
-                    $productTypeHandle = $commercePlugin::getInstance()->getProductTypes()->getProductTypeById($element->product->typeId)->handle;
-                    $info['sectionHandle'][] = $productTypeHandle;
-                    $info['sectionId'][] = $element->product->typeId;
-
-                    ## TODO: Add "enabled" support for other element types (assets, categories, entries, tags, users)
-                    $info['enabled'] = $element->product->enabled;
+                    $productType = $commercePlugin::getInstance()->getProductTypes()->getProductTypeById($element->typeId);
+                    $info['sectionHandle'][] = $productType->handle;
+                    $info['sectionId'][] = $element->typeId;
+                    $info['productTypeId'] = $element->typeId;
+                    $info['productTypeName'] = $productType->name;
+                    $info['enabled'] = $element->enabled;
                 }
                 break;
             case 'asset':
@@ -649,17 +829,15 @@ class AlgoliaSyncService extends Component
                     // this is where we send a quick message to Algolia to purge out their record
 
                     if ($deleteFromAlgolia && $processRecords) {
+
                         $elementData = [];
-                        $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+                        $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getSyncedMemberGroups();
                         $elementData['attributes'] = [];
                         $elementData['attributes']['objectID'] = $element->id;
 
                         AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord('delete', $elementData);
                     }
                 }
-
-
-
                 break;
         }
         return $info;
@@ -748,18 +926,6 @@ class AlgoliaSyncService extends Component
         // this would only create a single record in Algolia, which defeats the whole point of search
         // please let us know if you have a specific use case and we can add in support to meet the need
 
-//        // $globalSetsConfig
-//        $globalSets = Craft::$app->globals->getAllSets();
-//        $globalSetsConfig = [];
-//        foreach ($globalSets AS $globalSet) {
-//            $globalSetsConfig[] = array(
-//                'default_index' => $env.'_global_'.$globalSet->handle,
-//                'label' => $globalSet->name,
-//                'handle' => $globalSet->handle,
-//                'value' => $globalSet->id
-//            );
-//        }
-
         // user groups list
         $userGroups = Craft::$app->userGroups->getAllGroups();
         $userGroupsConfig = [];
@@ -789,7 +955,7 @@ class AlgoliaSyncService extends Component
             $productTypesConfig = [];
             foreach ($productTypes AS $productType) {
                 $productTypesConfig[] = array(
-                    'default_index' => $env.'_variant_'.$productType->handle,
+                    'default_index' => $env.'_product_'.$productType->handle,
                     'label' => $productType->name,
                     'handle' => $productType->handle,
                     'value' => $productType->id
@@ -797,7 +963,7 @@ class AlgoliaSyncService extends Component
             }
             $returnArray[] =     [
                 'label' => 'Commerce Product Types',
-                'handle' => 'variant',
+                'handle' => 'product',
                 'data' => $productTypesConfig
             ];
         }
@@ -820,8 +986,10 @@ class AlgoliaSyncService extends Component
 
     // AlgoliaSync::$plugin->algoliaSyncService->logger($message, __FILE__, __LINE__)
     public function logger($message, $filename, $linenumber) {
-        $file = Craft::getAlias('@storage/logs/algolia-sync.log');
-        $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
-        FileHelper::writeToFile($file, $log, ['append' => true]);
+        if (Craft::$app->getConfig()->general->devMode) {
+            $file = Craft::getAlias('@storage/logs/algolia-sync.log');
+            $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
+            FileHelper::writeToFile($file, $log, ['append' => true]);
+        }
     }
 }
