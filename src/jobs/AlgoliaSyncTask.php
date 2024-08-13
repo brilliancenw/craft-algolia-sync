@@ -76,6 +76,8 @@ class AlgoliaSyncTask extends BaseJob
     public function execute($queue): void
     {
 
+        Craft::info("Executing the Queue", "algolia-sync");
+
         $client = SearchClient::create(
             AlgoliaSync::$plugin->settings->getAlgoliaApp(),
             AlgoliaSync::$plugin->settings->getAlgoliaAdmin()

@@ -339,7 +339,7 @@ class AlgoliaSyncField extends Field
             'name' => $this->handle,
             'namespace' => $namespacedId,
             'prefix' => Craft::$app->getView()->namespaceInputId(''),
-            ];
+        ];
         $jsonVars = Json::encode($jsonVars);
         Craft::$app->getView()->registerJs("$('#{$namespacedId}-field').AlgoliaSyncAlgoliaSyncField(" . $jsonVars . ");");
 

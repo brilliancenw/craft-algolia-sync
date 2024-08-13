@@ -43,7 +43,7 @@ class Settings extends Model
     public string $algoliaAdmin = ''; // ALGOLIA_ADMIN
     public string $algoliaApp = '';              // ALGOLIA_APP
     public string $algoliaSearch = ''; // ALGOLIA_SEARCH
-    public array $algoliaElements     = []; // sections, categories, usergroups, etc...
+    public array $algoliaElements = []; // sections, categories, usergroups, etc...
 
     public function getAlgoliaAdmin(): string
     {

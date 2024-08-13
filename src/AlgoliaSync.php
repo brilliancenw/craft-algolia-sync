@@ -73,17 +73,10 @@ class AlgoliaSync extends Plugin
      *
      * @var AlgoliaSync
      */
-    public static AlgoliaSync $plugin;
+    public static $plugin;
 
     // Public Properties
     // =========================================================================
-
-    /**
-     * To execute your plugin’s migrations, you’ll need to increase its schema version.
-     *
-     * @var string
-     */
-    public string $schemaVersion = '1.0.1';
 
 
     // Public Methods
@@ -195,8 +188,6 @@ class AlgoliaSync extends Plugin
             User::class,
             User::EVENT_AFTER_SAVE,
             function (ModelEvent $event) {
-
-
 
                 $thisEventId = (int)$event->sender->id;
 

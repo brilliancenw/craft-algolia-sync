@@ -48,7 +48,6 @@ class DefaultController extends Controller
     // Protected Properties
     // =========================================================================
 
-
     // Public Methods
     // =========================================================================
 
@@ -103,6 +102,7 @@ class DefaultController extends Controller
      */
     public function actionLoadRecords()
     {
+
         $loadRecordTypes = Craft::$app->request->post('loadRecords');
 
         $queue = Craft::$app->getQueue();
@@ -111,8 +111,10 @@ class DefaultController extends Controller
 
             $loadRecordArray = explode('|', $loadRecordType);
 
+            $messageString = 'Queueing Up Bulk Records to sync into Algolia (Type: '.$loadRecordArray[0].', ID: '.$loadRecordArray[1].')';
+
             $jobId = $queue->push(new AlgoliaBulkLoadTask([
-                'description' => Craft::t('algolia-sync', 'Queueing Up Bulk Records to sync into Algolia (Type: '.$loadRecordArray[0].', ID: '.$loadRecordArray[1].')'),
+                'description' => Craft::t('algolia-sync', $messageString),
                 'loadRecordType' => $loadRecordArray,
             ]));
         }
