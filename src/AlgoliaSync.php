@@ -123,16 +123,13 @@ class AlgoliaSync extends Plugin
                 $event->rules['cpActionTrigger1'] = 'algolia-sync/default/do-something';
             }
         );
-
-        // Register our utilities
         Event::on(
             Utilities::class,
-            Utilities::EVENT_REGISTER_UTILITY_TYPES,
+            Utilities::EVENT_REGISTER_UTILITIES,
             function (RegisterComponentTypesEvent $event) {
                 $event->types[] = AlgoliaSyncUtilityUtility::class;
             }
         );
-
         // Register our fields
         Event::on(
             Fields::class,

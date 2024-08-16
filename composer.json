@@ -21,8 +21,8 @@
         }
     ],
     "require": {
-        "craftcms/cms": "^4",
-        "algolia/algoliasearch-client-php": "^3"
+        "craftcms/cms": "^5",
+        "algolia/algoliasearch-client-php": "^4"
     },
     "autoload": {
         "psr-4": {
@@ -39,5 +39,11 @@
             "algoliaSyncService": "brilliance\\algoliasync\\services\\AlgoliaSyncService"
         },
         "class": "brilliance\\algoliasync\\AlgoliaSync"
+    },
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
     }
 }

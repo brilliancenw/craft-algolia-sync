@@ -26,7 +26,7 @@ use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
 use brilliance\algoliasync\jobs\AlgoliaSyncTask;
 
-use Algolia\AlgoliaSearch\SearchClient;
+use Algolia\AlgoliaSearch\Api\SearchClient;
 use craft\helpers\FileHelper;
 
 
@@ -792,7 +792,7 @@ class AlgoliaSyncService extends Component
                 break;
             case 'entry':
                 if (!empty($element->sectionId)) {
-                    $info['sectionHandle'][] = Craft::$app->sections->getSectionById($element->sectionId)->handle;
+                    $info['sectionHandle'][] = Craft::$app->entries->getSectionById($element->sectionId)->handle;
                     $info['sectionId'][] = $element->sectionId;
                 }
                 break;
@@ -873,7 +873,7 @@ class AlgoliaSyncService extends Component
 
         // all Channel Sections
         $entriesConfig = array();
-        $allSections = Craft::$app->sections->getAllSections();
+        $allSections = Craft::$app->entries->allSections;
         foreach ($allSections as $section) {
             if (in_array($section->type, ['channel','structure'])) {
                 $sectionIndex = 'section-'.$section->id;
