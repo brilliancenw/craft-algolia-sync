@@ -339,10 +339,18 @@ class AlgoliaSyncService extends Component
     }
     public function getFieldData($element, $field, $fieldHandle): mixed
     {
-        $fieldTypeArray = explode('\\', get_class($field));
-        $fieldType = strtolower(array_pop($fieldTypeArray));
+        if (get_class($field) === 'craft\ckeditor\Field') {
+            $fieldType = 'ckeditor';
+        }
+        else {
+            $fieldTypeArray = explode('\\', get_class($field));
+            $fieldType = strtolower(array_pop($fieldTypeArray));
+        }
 
         switch ($fieldType) {
+            case 'ckeditor':
+                return $element->$fieldHandle;
+
             case 'plaintext':
                 $checkValue = $element->$fieldHandle;
                 if (is_numeric($checkValue)) {
