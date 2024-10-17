@@ -555,7 +555,10 @@ class AlgoliaSyncService extends Component
 
                 $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
 
-                if (isset($rawData['type']) && in_array($rawData['type'],$arrayFieldTypes)) {
+                if ($rawData instanceof \craft\ckeditor\data\FieldData) {
+                    $recordUpdate['attributes'][$fieldName] = $rawData->getRawContent();;
+                    }
+                elseif (isset($rawData['type']) && in_array($rawData['type'], $arrayFieldTypes)) {
                     $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
                     $idsFieldName = $fieldName.'Ids';
                     $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
