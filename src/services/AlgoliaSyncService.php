@@ -21,6 +21,9 @@ use craft\elements\Category;
 use craft\elements\User;
 use craft\helpers\App;
 use craft\helpers\MoneyHelper;
+use craft\helpers\ElementHelper;
+use craft\elements\db\ElementQuery;
+use craft\db\Query;
 
 use brilliance\algoliasync\events\beforeAlgoliaSyncEvent;
 
@@ -527,6 +530,29 @@ class AlgoliaSyncService extends Component
             // get the attributes of the entity
             $recordUpdate['attributes']['objectID'] = (int)$element->id;
             $recordUpdate['attributes']['message'] = (int)$element->id;
+
+            // Get the list of enabled sites
+            $enabledSitesIds = [];
+            $enabledSiteHandles = [];
+
+            $allSites = Craft::$app->getSites()->getAllSites();
+
+            foreach ($allSites as $site) {
+                // Query the database directly for the element's enabled status in this site
+                $isEnabled = (new Query())
+                    ->select(['enabled'])
+                    ->from(['{{%elements_sites}}'])
+                    ->where(['elementId' => $element->id, 'siteId' => $site->id])
+                    ->scalar();
+
+                if ($isEnabled == 1) {
+                    $enabledSitesIds[] = $site->id;
+                    $enabledSiteHandles[] = $site->handle;
+                }
+            }
+
+            $recordUpdate['attributes']['siteIds'] = $enabledSitesIds;
+            $recordUpdate['attributes']['siteHandles'] = $enabledSiteHandles;
 
             if (isset($element->slug)) {
                 $recordUpdate['attributes']['slug'] = $element->slug;
