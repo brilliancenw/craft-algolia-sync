@@ -77,6 +77,44 @@ AND
 
 This can be used for some very complex JS work on the display of your search results in instantsearch.
 
+### Multi-Language and Multi-Site
+
+This plugin supports multi-language indexing by including site-specific attributes for each element saved to Algolia. When an element is saved, it is automatically indexed with the following two attributes:
+
+- `siteIds`: An array of site IDs where the element is enabled.
+- `siteHandles`: An array of corresponding site handles that represent the sites.
+
+For example, if an element is enabled on two sites, the data sent to Algolia might look like:
+
+```json
+{
+    "siteIds": [1, 2],
+    "siteHandles": ["default", "secondSite"]
+}
+```
+
+#### Filtering Results by Language or Site
+
+To filter search results for a specific site or language, you can add a simple filter to your Algolia query. Use the `siteIds` or `siteHandles` attributes to only retrieve results enabled for a particular site.
+
+For example, to filter by the `default` site using `siteHandles`, your query would include:
+
+```js
+index.search(query, {
+    filters: 'siteHandles:default'
+});
+```
+
+Or, if you prefer filtering by `siteIds`, use:
+
+```js
+index.search(query, {
+    filters: 'siteIds:1'
+});
+```
+
+This ensures that only the elements enabled for the specified site are returned in your search results.
+
 
 
 ## Algolia Sync Roadmap
@@ -86,7 +124,7 @@ Some things to do, and ideas for potential features:
 - Configuration to exclude specific fields from the sync (for example: in a user record, do not send their email
   address to Algolia)
 - Support for Matrix Fields
-- Support for 3rd Party Field Types (maps, tables, etc)
+- Support for 3rd Party Field Types (tables, etc)
 - Custom date format for each date field
 
 Pull Requests, Feature Requests and Bug Reports are welcome - please submit to the Git repository:
