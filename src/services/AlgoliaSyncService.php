@@ -680,24 +680,60 @@ class AlgoliaSyncService extends Component
 
                     // get the basic product info
                     $recordUpdate['elementType'] = ucwords($elementTypeSlug);
-                    $recordUpdate['handle'] = $elementInfo['sectionHandle'][0];
-                    $recordUpdate['attributes']['title'] = $element->title;
-                    $recordUpdate['attributes']['productId'] = $element->id;
-                    $recordUpdate['attributes']['typeId'] = $element->typeId;
-                    $recordUpdate['attributes']['taxCategoryId'] = $element->taxCategoryId;
-                    $recordUpdate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
-                    $recordUpdate['attributes']['defaultSku'] = $element->defaultSku;
-                    $recordUpdate['attributes']['ProductType'] = $elementInfo['productTypeName'];
-                    $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
-                    $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
-                    $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
-                    $recordUpdate['attributes']['onSale'] = $onSale;
-                    $recordUpdate['attributes']['salePrice'] = $salePrice;
-                    $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
-                    $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
-                    $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
-                    $recordUpdate['attributes']['defaultWeight'] = $element->defaultWeight;
-                    $recordUpdate['attributes']['taxCategory'] = $element->taxCategory;
+                    $recordUpdate['handle'] = $elementInfo['sectionHandle'][0] ?? null;
+                    $recordUpdate['attributes']['title'] = $element->title ?? null;
+
+                    if (isset($element->id)) {
+                        $recordUpdate['attributes']['productId'] = $element->id;
+                    }
+                    if (isset($element->typeId)) {
+                        $recordUpdate['attributes']['typeId'] = $element->typeId;
+                    }
+                    if (isset($element->taxCategoryId)) {
+                        $recordUpdate['attributes']['taxCategoryId'] = $element->taxCategoryId;
+                    }
+                    if (isset($element->shippingCategoryId)) {
+                        $recordUpdate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
+                    }
+                    if (isset($element->defaultSku)) {
+                        $recordUpdate['attributes']['defaultSku'] = $element->defaultSku;
+                    }
+                    if (isset($element->availableForPurchase)) {
+                        $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
+                    }
+                    if (isset($element->defaultVariantId)) {
+                        $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
+                    }
+                    if (isset($element->defaultPrice)) {
+                        $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
+                    }
+                    if (isset($element->defaultWidth)) {
+                        $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
+                    }
+                    if (isset($element->defaultHeight)) {
+                        $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
+                    }
+                    if (isset($element->defaultLength)) {
+                        $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
+                    }
+                    if (isset($element->defaultWeight)) {
+                        $recordUpdate['attributes']['defaultWeight'] = $element->defaultWeight;
+                    }
+                    if (isset($element->taxCategory)) {
+                        $recordUpdate['attributes']['taxCategory'] = $element->taxCategory;
+                    }
+
+
+                    if (isset($elementInfo['productTypeName'])) {
+                        $recordUpdate['attributes']['ProductType'] = $elementInfo['productTypeName'];
+                    }
+
+                    if (isset($onSale)) {
+                        $recordUpdate['attributes']['onSale'] = $onSale; // Assuming $onSale is already a boolean or correct type
+                    }
+                    if (isset($salePrice)) {
+                        $recordUpdate['attributes']['salePrice'] = $salePrice; // Assuming $salePrice is already a number/string or correct type
+                    }
 
                     // now load all variants
                     $getAllVariants = \craft\commerce\elements\Variant::find()->productId($element->id);
@@ -707,19 +743,50 @@ class AlgoliaSyncService extends Component
                     foreach ($getAllVariants AS $variantDetails) {
 
                         $variantInfo = [];
-                        $variantInfo['title'] = $variantDetails->title;
-                        $variantInfo['productId'] = (int)$variantDetails->productId;
-                        $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
-                        $variantInfo['price'] = (float)$variantDetails->price;
-                        $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
-                        $variantInfo['width'] = (float)$variantDetails->width;
-                        $variantInfo['height'] = (float)$variantDetails->height;
-                        $variantInfo['length'] = (float)$variantDetails->length;
-                        $variantInfo['stock'] = (int)$variantDetails->stock;
-                        $variantInfo['weight'] = (float)$variantDetails->weight;
-                        $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
-                        $variantInfo['minQty'] = (int)$variantDetails->minQty;
-                        $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
+
+                        $variantInfo['title'] = $variantDetails->title ?? null;
+
+                        $variantInfo['variantId'] = $variantDetails->id ?? null;
+
+                        if (isset($variantDetails->productId)) {
+                            $variantInfo['productId'] = (int)$variantDetails->productId;
+                        }
+                        if (isset($variantDetails->isDefault)) {
+                            $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
+                        }
+                        if (isset($variantDetails->price)) {
+                            $variantInfo['price'] = (float)$variantDetails->price;
+                        }
+                        if (isset($variantDetails->sortOrder)) {
+                            $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
+                        }
+                        if (isset($variantDetails->width)) {
+                            $variantInfo['width'] = (float)$variantDetails->width;
+                        }
+                        if (isset($variantDetails->height)) {
+                            $variantInfo['height'] = (float)$variantDetails->height;
+                        }
+                        if (isset($variantDetails->length)) {
+                            $variantInfo['length'] = (float)$variantDetails->length;
+                        }
+                        if (isset($variantDetails->stock)) {
+                            $variantInfo['stock'] = (int)$variantDetails->stock;
+                        }
+                        if (isset($variantDetails->weight)) {
+                            $variantInfo['weight'] = (float)$variantDetails->weight;
+                        }
+                        if (isset($variantDetails->hasUnlimitedStock)) {
+                            $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
+                        }
+                        if (isset($variantDetails->minQty)) {
+                            $variantInfo['minQty'] = (int)$variantDetails->minQty;
+                        }
+                        if (isset($variantDetails->maxQty)) {
+                            // Note: maxQty might be 0 or null when there's no maximum.
+                            // isset() handles the null case. If 0 is a meaningful value you want,
+                            // this check is still correct as 0 is considered "set".
+                            $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
+                        }
 
                         // nest each variant under the product info
                         $recordUpdate['attributes']['variants'][] = $variantInfo;
