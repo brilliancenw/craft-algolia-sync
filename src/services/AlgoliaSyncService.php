@@ -667,7 +667,7 @@ class AlgoliaSyncService extends Component
 
                     $defaultVariant = $element->defaultVariant;
 
-                    if ($defaultVariant->onSale) {
+                    if (isset($defaultVariant) &&  isset($defaultVariant->onSale)) {
                         $salePrice = (float)$defaultVariant->salePrice;
                         $onSale = true;
                     }
