@@ -11,7 +11,7 @@ class AlgoliaSyncTask extends BaseJob
 {
     public array $algoliaIndex = [];
     public string $algoliaFunction = ''; // delete or insert
-    public int $algoliaObjectID = 0;
+    public string $algoliaObjectID = '';
     public array $algoliaRecord = [];
     public string $algoliaMessage = 'Algolia Sync Task';
 

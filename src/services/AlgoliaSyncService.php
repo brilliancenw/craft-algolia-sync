@@ -150,7 +150,7 @@ class AlgoliaSyncService extends Component
             $queue->push(new AlgoliaSyncTask([
                 'algoliaIndex' => $algoliaIndex,
                 'algoliaFunction' => 'delete',
-                'algoliaObjectID' => $element->id,
+                'algoliaObjectID' => $element->id.'-'.$element->siteId,
                 'algoliaRecord' => [],
                 'algoliaMessage' => "Item is not enabled, confirming it's removed from Algolia"
             ]));
@@ -528,7 +528,7 @@ class AlgoliaSyncService extends Component
                 }
             }
             // get the attributes of the entity
-            $recordUpdate['attributes']['objectID'] = (int)$element->id;
+            $recordUpdate['attributes']['objectID'] = $element->id.'-'.$element->siteId;
             $recordUpdate['attributes']['message'] = (int)$element->id;
 
             // Get the list of enabled sites
@@ -937,7 +937,7 @@ class AlgoliaSyncService extends Component
                         $elementData = [];
                         $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getSyncedMemberGroups();
                         $elementData['attributes'] = [];
-                        $elementData['attributes']['objectID'] = $element->id;
+                        $elementData['attributes']['objectID'] = $element->id.'-'.$element->siteId;
 
                         AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord('delete', $elementData);
                     }
