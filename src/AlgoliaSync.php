@@ -221,16 +221,7 @@ class AlgoliaSync extends Plugin
                     return $event;
                 }
 
-                $thisEventId = (int)$event->element->id;
-
-                static $recursionLevel = 0;
-                static $recursiveRecord = array();
-
-                if (!in_array($thisEventId, $recursiveRecord)) {
-                    $recursionLevel++;
-                    $recursiveRecord[] = $thisEventId;
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->element, 'save');
-                }
+                AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->element, 'save');
 
                 return $event;
             });
