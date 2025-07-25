@@ -58,40 +58,6 @@ class DefaultController extends Controller
      */
     public function actionIndex(): craft\web\Response
     {
-
-//        $result = array();
-//        $algoliaSettings = AlgoliaSync::$plugin->getSettings();
-//
-//        if (is_array($algoliaSettings['algoliaSections'])) {
-//            $result[] = '<h4>Entry Types</h4>';
-//            $result[] = '<ul>';
-//            foreach ($algoliaSettings['algoliaSections'] AS $typeId) {
-//                $entryType = Craft::$app->sections->getSectionById($typeId);
-//
-//                $result[] = '<li><a href="'.UrlHelper::actionUrl(('algolia-sync/default/load-records?elementType=entry&elementTypeId='.$entryType->id)).'">'.$entryType->name."</a>";
-//            }
-//            $result[] = '</ul>';
-//        }
-//        if (is_array($algoliaSettings['algoliaCategories'])) {
-//            $result[] = '<h4>Category Groups</h4>';
-//            $result[] = '<ul>';
-//            foreach ($algoliaSettings['algoliaCategories'] AS $categoryGroup) {
-//                $categoryGroup = Craft::$app->categories->getGroupById($categoryGroup);
-//                $result[] = '<li><a href="'.UrlHelper::actionUrl(('algolia-sync/default/load-records?elementType=category&elementTypeId='.$categoryGroup->id)).'">'.$categoryGroup->name."</a>";
-//            }
-//            $result[] = '</ul>';
-//        }
-//
-//        if (is_array($algoliaSettings['algoliaUserGroupList'])) {
-//            $result[] = '<h4>User Groups</h4>';
-//            $result[] = '<ul>';
-//            foreach ($algoliaSettings['algoliaUserGroupList'] AS $userGroup) {
-//                $memberGroups = Craft::$app->userGroups->getGroupById($userGroup);
-//                $result[] = '<li><a href="'.UrlHelper::actionUrl(('actions/algolia-sync/default/load-records?elementType=user&elementTypeId='.$memberGroups->id)).'">'.$memberGroups->name."</a>";
-//            }
-//            $result[] = '</ul>';
-//        }
-//        return implode($result);
         return new Response();
     }
 
@@ -102,29 +68,39 @@ class DefaultController extends Controller
      */
     public function actionLoadRecords()
     {
+        $this->requirePostRequest(); // Optional but recommended for safety
 
         $loadRecordTypes = Craft::$app->request->post('loadRecords');
 
+        if (!$loadRecordTypes || !is_array($loadRecordTypes)) {
+            Craft::$app->getSession()->setFlash('yourVariable', 'No record types were selected.');
+            return $this->redirectToPostedUrl();
+        }
+
         $queue = Craft::$app->getQueue();
+        $queuedCount = 0;
 
-        foreach ($loadRecordTypes AS $loadRecordType) {
-
+        foreach ($loadRecordTypes as $loadRecordType) {
             $loadRecordArray = explode('|', $loadRecordType);
+            if (count($loadRecordArray) !== 2) {
+                continue;
+            }
 
-            $messageString = 'Queueing Up Bulk Records to sync into Algolia (Type: '.$loadRecordArray[0].', ID: '.$loadRecordArray[1].')';
+            $messageString = 'Queueing Up Bulk Records to sync into Algolia (Type: ' . $loadRecordArray[0] . ', ID: ' . $loadRecordArray[1] . ')';
 
-            $jobId = $queue->push(new AlgoliaBulkLoadTask([
+            $queue->push(new AlgoliaBulkLoadTask([
                 'description' => Craft::t('algolia-sync', $messageString),
                 'loadRecordType' => $loadRecordArray,
             ]));
+
+            $queuedCount++;
         }
 
-        // todo : fix the method return
-        print "these records have been queued";
-        exit;
+        // Show success message in the CP (it will appear on the next request)
+        Craft::$app->getSession()->setFlash('yourVariable', "{$queuedCount} record types have been queued for Algolia sync.");
 
-
-        // Craft::$app->getResponse()->redirect($utilitiesUrl);
-
+        // Redirect back to the CP utility page or wherever the form was submitted from
+        return $this->redirectToPostedUrl();
     }
+
 }

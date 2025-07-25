@@ -1,32 +1,58 @@
 {# @var craft \craft\web\twig\variables\CraftVariable #}
 {% do view.registerAssetBundle('brilliance\\algoliasync\\assetbundles\\algoliasync\\AlgoliaSyncAsset') %}
 
-<h1>Bulk Load Records into Algolia</h1>
-
 {% set message = craft.app.session.getFlash('yourVariable') %}
-{%  if message %}
-    <h2>{{ message }}</h2>
-{%  endif %}
 
-<p>This will queue up every record from the specified record type to be entered into Algolia.  This will not create duplicates.  This does not purge any records that may already exist in Algolia that may have been removed from Craft.  You may want to "clear" the Index in Algolia prior to loading from here</p>
-<a href="{{ cpUrl('settings/plugins/algolia-sync') }}">Visit the Settings Page to Choose Which Element Types are Configured to Be Loaded into Algolia</a>
-<form action="{{ actionUrl('algolia-sync/default/load-records') }}" method="post" id="algoliaSyncLoad">
-    {{ csrfInput() }}
-    {% for elementType in supportedElementsConfig %}
-            <h3>{{ elementType.label }}</h3>
-                <ul>
+<div class="pane">
+    <h1 class="heading">Bulk Load Records into Algolia</h1>
+
+    {% if message %}
+        <div class="notification">
+            {{ message }}
+        </div>
+    {% endif %}
+
+    <p class="light">
+        This will queue up every record from the selected types to be sent to Algolia. It will not create duplicates or remove existing records in Algolia that no longer exist in Craft.
+    </p>
+    <p>
+        If you want a clean slate, <strong>clear the Algolia index manually first</strong>.
+    </p>
+    <p>
+        <a href="{{ cpUrl('settings/plugins/algolia-sync') }}" class="go">Go to the Settings Page</a> to configure which elements are synced.
+    </p>
+
+    <form action="{{ actionUrl('algolia-sync/default/load-records') }}" method="post" id="algoliaSyncLoad">
+        {{ csrfInput() }}
+
+        {% for elementType in supportedElementsConfig %}
+            <fieldset class="field">
+                <legend class="heading">{{ elementType.label }}</legend>
+                <div class="checkbox-group">
                     {% set elementTypeSync = false %}
-                {%  for item in elementType.data %}
-                    {% if settings['algoliaElements'][elementType.handle][item.value]['sync'] is defined and settings['algoliaElements'][elementType.handle][item.value]['sync'] == '1' %}
-                        <li><input type="checkbox" class='algoliaLoadCheckbox' name="loadRecords[]" value="{{ elementType.handle }}|{{ item.value }}" /> Send all {{ item.label }} to sync with Algolia</li>
-                        {% set elementTypeSync = true %}
+                    {% for item in elementType.data %}
+                        {% set config = settings['algoliaElements'][elementType.handle][item.value] ?? null %}
+                        {% if config and config.sync == '1' %}
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" class="algoliaLoadCheckbox" name="loadRecords[]" value="{{ elementType.handle }}|{{ item.value }}">
+                                    Send all <strong>{{ item.label }}</strong> to sync with Algolia
+                                </label>
+                            </div>
+                            {% set elementTypeSync = true %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if not elementTypeSync %}
+                        <div class="light">
+                            No {{ elementType.label|lower }} configured to sync. <a href="{{ cpUrl('settings/plugins/algolia-sync') }}">Configure now</a>.
+                        </div>
                     {% endif %}
-                {%  endfor %}
-                {% if elementTypeSync == false %}
-                    <li>There are no {{ elementType.label }} <a href="{{ cpUrl('settings/plugins/algolia-sync') }}">configured to sync</a></li>
-                {% endif %}
-                </ul>
-    {% endfor %}
-    <p>&nbsp;</p>
-    <input type="submit" class="btn submit" value="Bulk Load Records" />
-</form>
+                </div>
+            </fieldset>
+        {% endfor %}
+
+        <div class="buttons">
+            <button type="submit" class="btn submit">Bulk Load Records</button>
+        </div>
+    </form>
+</div>
