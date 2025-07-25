@@ -13,7 +13,7 @@ class AlgoliaSyncTask extends BaseJob
     public string $algoliaFunction = ''; // delete or insert
     public string $algoliaObjectID = '';
     public array $algoliaRecord = [];
-    public string $algoliaMessage = 'Algolia Sync Task';
+    public string $algoliaMessage = 'Algolia Sync Task - one';
 
     public function execute($queue): void
     {
@@ -49,6 +49,6 @@ class AlgoliaSyncTask extends BaseJob
 
     protected function defaultDescription(): string
     {
-        return Craft::t('algolia-sync', 'Algolia Sync Task');
+        return Craft::t('algolia-sync', 'Algolia Sync Task - two');
     }
 }
