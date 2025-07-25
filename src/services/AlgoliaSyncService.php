@@ -518,319 +518,448 @@ class AlgoliaSyncService extends Component
         return null;
     }
 
-    public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '') {
+//    public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '') {
+//
+//        $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
+//        $elementTypeSlug = $elementInfo['type'];
+//
+//        AlgoliaSync::$plugin->algoliaSyncService->logger("This type of item has been saved:: ".$elementTypeSlug, basename(__FILE__) , __LINE__);
+//        // do we update this type of element?
+//        $recordUpdate = array();
+//
+//        $okayToSync = AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element);
+//
+//        if ($okayToSync) {
+//            AlgoliaSync::$plugin->algoliaSyncService->logger("We are going to sync", basename(__FILE__) , __LINE__);
+//
+//            // what type of element
+//            // user, entry, category
+//            $recordUpdate['attributes'] = array();
+//
+//            if ($action == 'delete') {
+//                $algoliaAction = 'delete';
+//            } else {
+//                if ($element->enabled) {
+//                    $algoliaAction = 'insert';
+//                } else {
+//                    $algoliaAction = 'delete';
+//                }
+//            }
+//            // get the attributes of the entity
+//            $recordUpdate['attributes']['objectID'] = $element->id.'-'.$element->siteId;
+//            $recordUpdate['attributes']['message'] = (int)$element->id;
+//
+//            // Get the list of enabled sites
+//            $enabledSitesIds = [];
+//            $enabledSiteHandles = [];
+//
+//            $allSites = Craft::$app->getSites()->getAllSites();
+//
+//            foreach ($allSites as $site) {
+//                // Query the database directly for the element's enabled status in this site
+//                $isEnabled = (new Query())
+//                    ->select(['enabled'])
+//                    ->from(['{{%elements_sites}}'])
+//                    ->where(['elementId' => $element->id, 'siteId' => $site->id])
+//                    ->scalar();
+//
+//                if ($isEnabled == 1) {
+//                    $enabledSitesIds[] = $site->id;
+//                    $enabledSiteHandles[] = $site->handle;
+//                }
+//            }
+//
+//            $recordUpdate['attributes']['siteIds'] = $enabledSitesIds;
+//            $recordUpdate['attributes']['siteHandles'] = $enabledSiteHandles;
+//
+//            if (isset($element->slug)) {
+//                $recordUpdate['attributes']['slug'] = $element->slug;
+//            }
+//            if (isset($element->authorId)) {
+//                $recordUpdate['attributes']['authorId'] = (int)$element->authorId;
+//            }
+//            if (isset($element->postDate)) {
+//                $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
+//            }
+//
+//            if (!empty($element->product)) {
+//                $fields = $element->product->getFieldLayout()->getCustomFields();
+//            } else {
+//                $fields = $element->getFieldLayout()->getCustomFields();
+//            }
+//
+//            $arrayFieldTypes = array('entries','tags','users');
+//
+//            foreach ($fields AS $field) {
+//                $fieldHandle = $field->handle;
+//
+//                // send this off to a function to extract the specific information
+//                // based on what type of field it is (asset, text, varchar, etc...)
+//                $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
+//
+//                $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
+//
+//                if ($rawData instanceof \craft\ckeditor\data\FieldData) {
+//                    $recordUpdate['attributes'][$fieldName] = $rawData->getRawContent();;
+//                    }
+//                elseif (isset($rawData['type']) && in_array($rawData['type'], $arrayFieldTypes)) {
+//                    $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
+//                    $idsFieldName = $fieldName.'Ids';
+//                    $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
+//                }
+//                elseif (isset($rawData['type']) && $rawData['type'] == 'mapfield') {
+//                    $recordUpdate['attributes'][$fieldName] = $rawData;
+//                    $recordUpdate['attributes'][$fieldName.'_address'] = $rawData['address'];
+//                    $recordUpdate['attributes'][$fieldName.'_lat'] = $rawData['lat'];
+//                    $recordUpdate['attributes'][$fieldName.'_lng'] = $rawData['lng'];
+//                    $recordUpdate['attributes'][$fieldName.'_zoom']['zoom'] = $rawData['zoom'];
+//                    if (!empty($rawData['lat']) && !empty($rawData['lng'])) {
+//                        // https://www.algolia.com/doc/guides/managing-results/refine-results/geolocation/#enabling-geo-search-by-adding-geolocation-data-to-records
+//                        // inject a _geoloc into Algolia
+//                        // this doesn't take into account if there are multiple _geoloc...
+//                        // that will be more complex to resolve
+//                        $recordUpdate['attributes']['_geoloc'] = [];
+//                        $recordUpdate['attributes']['_geoloc']['lat'] = $rawData['lat'];
+//                        $recordUpdate['attributes']['_geoloc']['lng'] = $rawData['lng'];
+//                    }
+//                }
+//                elseif (isset($rawData['type']) && $rawData['type'] == 'categories') {
+//
+//                    $recordUpdate['attributes'][$fieldName] = $rawData['flat'];
+//                    $nestedName = $fieldName."_hx";
+//                    $recordUpdate['attributes'][$nestedName] = $rawData['nested'];
+//
+//                }
+//                else {
+//                    $recordUpdate['attributes'][$fieldName] = $rawData;
+//                }
+//
+//                $fieldTypeLong = get_class($field);
+//                $fieldTypeArray = explode('\\', $fieldTypeLong);
+//                $fieldType = strtolower(array_pop($fieldTypeArray));
+//
+//                // for the date field, create a few versions of the date
+//                // todo : add in a config for custom date format to be added
+//                if ($fieldType == 'date') {
+//                    // get the friendly date
+//                    $friendlyName = $fieldName . "_friendly";
+//                    $friendlyDate = date('n/j/Y', $rawData);
+//                    $recordUpdate['attributes'][$friendlyName] = $friendlyDate;
+//
+//                    // get the previous midnight of the current date (unix timestamp)
+//                    $midnightName = $fieldName . "_midnight";
+//                    $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
+//                    $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
+//                }
+//            }
+//
+//            $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+//
+//            switch ($elementTypeSlug) {
+//                case 'category':
+//                case 'entry':
+//                case 'asset':
+//                case 'tag':
+//
+//                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
+//                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
+//                    $recordUpdate['attributes']['title'] = $element->title;
+//                    break;
+//
+//                case 'user':
+//                    $recordUpdate['elementType'] = 'User';
+//                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
+//                    $recordUpdate['attributes']['title'] = $element->username;
+//                    $recordUpdate['attributes']['firstname'] = $element->firstName;
+//                    $recordUpdate['attributes']['lastname'] = $element->lastName;
+//                    $recordUpdate['attributes']['email'] = $element->email;
+//                    $userGroups = $element->getGroups();
+//                    $groupList = [];
+//                    foreach ($userGroups AS $group) {
+//                        $groupList[] = $group->handle;
+//                    }
+//                    $recordUpdate['attributes']['userGroups'] = $groupList;
+//                    break;
+//
+//                case 'product':
+//
+//                    $defaultVariant = $element->defaultVariant;
+//
+//                    if (isset($defaultVariant) &&  isset($defaultVariant->onSale)) {
+//                        $salePrice = (float)$defaultVariant->salePrice;
+//                        $onSale = true;
+//                    }
+//                    else {
+//                        $salePrice = null;
+//                        $onSale = false;
+//                    }
+//
+//                    AlgoliaSync::$plugin->algoliaSyncService->logger("Product is being loaded", basename(__FILE__) , __LINE__);
+//
+//                    // get the basic product info
+//                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
+//                    $recordUpdate['handle'] = $elementInfo['sectionHandle'][0] ?? null;
+//                    $recordUpdate['attributes']['title'] = $element->title ?? null;
+//
+//                    if (isset($element->id)) {
+//                        $recordUpdate['attributes']['productId'] = $element->id;
+//                    }
+//                    if (isset($element->typeId)) {
+//                        $recordUpdate['attributes']['typeId'] = $element->typeId;
+//                    }
+//                    if (isset($element->taxCategoryId)) {
+//                        $recordUpdate['attributes']['taxCategoryId'] = $element->taxCategoryId;
+//                    }
+//                    if (isset($element->shippingCategoryId)) {
+//                        $recordUpdate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
+//                    }
+//                    if (isset($element->defaultSku)) {
+//                        $recordUpdate['attributes']['defaultSku'] = $element->defaultSku;
+//                    }
+//                    if (isset($element->availableForPurchase)) {
+//                        $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
+//                    }
+//                    if (isset($element->defaultVariantId)) {
+//                        $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
+//                    }
+//                    if (isset($element->defaultPrice)) {
+//                        $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
+//                    }
+//                    if (isset($element->defaultWidth)) {
+//                        $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
+//                    }
+//                    if (isset($element->defaultHeight)) {
+//                        $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
+//                    }
+//                    if (isset($element->defaultLength)) {
+//                        $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
+//                    }
+//                    if (isset($element->defaultWeight)) {
+//                        $recordUpdate['attributes']['defaultWeight'] = $element->defaultWeight;
+//                    }
+//                    if (isset($element->taxCategory)) {
+//                        $recordUpdate['attributes']['taxCategory'] = $element->taxCategory;
+//                    }
+//
+//
+//                    if (isset($elementInfo['productTypeName'])) {
+//                        $recordUpdate['attributes']['ProductType'] = $elementInfo['productTypeName'];
+//                    }
+//
+//                    if (isset($onSale)) {
+//                        $recordUpdate['attributes']['onSale'] = $onSale; // Assuming $onSale is already a boolean or correct type
+//                    }
+//                    if (isset($salePrice)) {
+//                        $recordUpdate['attributes']['salePrice'] = $salePrice; // Assuming $salePrice is already a number/string or correct type
+//                    }
+//
+//                    // now load all variants
+//                    $getAllVariants = \craft\commerce\elements\Variant::find()->productId($element->id);
+//
+//                    $recordUpdate['attributes']['variants'] = [];
+//
+//                    foreach ($getAllVariants AS $variantDetails) {
+//
+//                        $variantInfo = [];
+//
+//                        $variantInfo['title'] = $variantDetails->title ?? null;
+//
+//                        $variantInfo['variantId'] = $variantDetails->id ?? null;
+//
+//                        if (isset($variantDetails->productId)) {
+//                            $variantInfo['productId'] = (int)$variantDetails->productId;
+//                        }
+//                        if (isset($variantDetails->isDefault)) {
+//                            $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
+//                        }
+//                        if (isset($variantDetails->price)) {
+//                            $variantInfo['price'] = (float)$variantDetails->price;
+//                        }
+//                        if (isset($variantDetails->sortOrder)) {
+//                            $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
+//                        }
+//                        if (isset($variantDetails->width)) {
+//                            $variantInfo['width'] = (float)$variantDetails->width;
+//                        }
+//                        if (isset($variantDetails->height)) {
+//                            $variantInfo['height'] = (float)$variantDetails->height;
+//                        }
+//                        if (isset($variantDetails->length)) {
+//                            $variantInfo['length'] = (float)$variantDetails->length;
+//                        }
+//                        if (isset($variantDetails->stock)) {
+//                            $variantInfo['stock'] = (int)$variantDetails->stock;
+//                        }
+//                        if (isset($variantDetails->weight)) {
+//                            $variantInfo['weight'] = (float)$variantDetails->weight;
+//                        }
+//                        if (isset($variantDetails->hasUnlimitedStock)) {
+//                            $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
+//                        }
+//                        if (isset($variantDetails->minQty)) {
+//                            $variantInfo['minQty'] = (int)$variantDetails->minQty;
+//                        }
+//                        if (isset($variantDetails->maxQty)) {
+//                            // Note: maxQty might be 0 or null when there's no maximum.
+//                            // isset() handles the null case. If 0 is a meaningful value you want,
+//                            // this check is still correct as 0 is considered "set".
+//                            $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
+//                        }
+//
+//                        // nest each variant under the product info
+//                        $recordUpdate['attributes']['variants'][] = $variantInfo;
+//
+//                    }
+//
+//                    break;
+//
+//            }
+//
+//            // Fire event for tracking before the sync event.
+//            $event = new beforeAlgoliaSyncEvent([
+//                'recordElement' => $element,
+//                'recordUpdate' => $recordUpdate
+//            ]);
+//
+//            $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
+//            $recordUpdate = $event->recordUpdate;
+//
+//            // $recordUpdate['elementType']
+//            AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord($algoliaAction, $recordUpdate, $algoliaMessage);
+//        }
+//        else {
+//            AlgoliaSync::$plugin->algoliaSyncService->logger("Not okay to sync...", basename(__FILE__) , __LINE__);
+//        }
+//    }
 
-        $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
-        $elementTypeSlug = $elementInfo['type'];
+    public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '')
+    {
+        // Gather element info and short-circuit if not synced
+        $elementInfo = $this->getEventElementInfo($element);
+        $type = $elementInfo['type'];
+        $this->logger("Preparing sync for {$type} ID {$element->id}", __FILE__, __LINE__);
 
-        AlgoliaSync::$plugin->algoliaSyncService->logger("This type of item has been saved:: ".$elementTypeSlug, basename(__FILE__) , __LINE__);
-        // do we update this type of element?
-        $recordUpdate = array();
-
-        $okayToSync = AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element);
-
-        if ($okayToSync) {
-            AlgoliaSync::$plugin->algoliaSyncService->logger("We are going to sync", basename(__FILE__) , __LINE__);
-
-            // what type of element
-            // user, entry, category
-            $recordUpdate['attributes'] = array();
-
-            if ($action == 'delete') {
-                $algoliaAction = 'delete';
-            } else {
-                if ($element->enabled) {
-                    $algoliaAction = 'insert';
-                } else {
-                    $algoliaAction = 'delete';
-                }
-            }
-            // get the attributes of the entity
-            $recordUpdate['attributes']['objectID'] = $element->id.'-'.$element->siteId;
-            $recordUpdate['attributes']['message'] = (int)$element->id;
-
-            // Get the list of enabled sites
-            $enabledSitesIds = [];
-            $enabledSiteHandles = [];
-
-            $allSites = Craft::$app->getSites()->getAllSites();
-
-            foreach ($allSites as $site) {
-                // Query the database directly for the element's enabled status in this site
-                $isEnabled = (new Query())
-                    ->select(['enabled'])
-                    ->from(['{{%elements_sites}}'])
-                    ->where(['elementId' => $element->id, 'siteId' => $site->id])
-                    ->scalar();
-
-                if ($isEnabled == 1) {
-                    $enabledSitesIds[] = $site->id;
-                    $enabledSiteHandles[] = $site->handle;
-                }
-            }
-
-            $recordUpdate['attributes']['siteIds'] = $enabledSitesIds;
-            $recordUpdate['attributes']['siteHandles'] = $enabledSiteHandles;
-
-            if (isset($element->slug)) {
-                $recordUpdate['attributes']['slug'] = $element->slug;
-            }
-            if (isset($element->authorId)) {
-                $recordUpdate['attributes']['authorId'] = (int)$element->authorId;
-            }
-            if (isset($element->postDate)) {
-                $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
-            }
-
-            if (!empty($element->product)) {
-                $fields = $element->product->getFieldLayout()->getCustomFields();
-            } else {
-                $fields = $element->getFieldLayout()->getCustomFields();
-            }
-
-            $arrayFieldTypes = array('entries','tags','users');
-
-            foreach ($fields AS $field) {
-                $fieldHandle = $field->handle;
-
-                // send this off to a function to extract the specific information
-                // based on what type of field it is (asset, text, varchar, etc...)
-                $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
-
-                $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
-
-                if ($rawData instanceof \craft\ckeditor\data\FieldData) {
-                    $recordUpdate['attributes'][$fieldName] = $rawData->getRawContent();;
-                    }
-                elseif (isset($rawData['type']) && in_array($rawData['type'], $arrayFieldTypes)) {
-                    $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
-                    $idsFieldName = $fieldName.'Ids';
-                    $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
-                }
-                elseif (isset($rawData['type']) && $rawData['type'] == 'mapfield') {
-                    $recordUpdate['attributes'][$fieldName] = $rawData;
-                    $recordUpdate['attributes'][$fieldName.'_address'] = $rawData['address'];
-                    $recordUpdate['attributes'][$fieldName.'_lat'] = $rawData['lat'];
-                    $recordUpdate['attributes'][$fieldName.'_lng'] = $rawData['lng'];
-                    $recordUpdate['attributes'][$fieldName.'_zoom']['zoom'] = $rawData['zoom'];
-                    if (!empty($rawData['lat']) && !empty($rawData['lng'])) {
-                        // https://www.algolia.com/doc/guides/managing-results/refine-results/geolocation/#enabling-geo-search-by-adding-geolocation-data-to-records
-                        // inject a _geoloc into Algolia
-                        // this doesn't take into account if there are multiple _geoloc...
-                        // that will be more complex to resolve
-                        $recordUpdate['attributes']['_geoloc'] = [];
-                        $recordUpdate['attributes']['_geoloc']['lat'] = $rawData['lat'];
-                        $recordUpdate['attributes']['_geoloc']['lng'] = $rawData['lng'];
-                    }
-                }
-                elseif (isset($rawData['type']) && $rawData['type'] == 'categories') {
-
-                    $recordUpdate['attributes'][$fieldName] = $rawData['flat'];
-                    $nestedName = $fieldName."_hx";
-                    $recordUpdate['attributes'][$nestedName] = $rawData['nested'];
-
-                }
-                else {
-                    $recordUpdate['attributes'][$fieldName] = $rawData;
-                }
-
-                $fieldTypeLong = get_class($field);
-                $fieldTypeArray = explode('\\', $fieldTypeLong);
-                $fieldType = strtolower(array_pop($fieldTypeArray));
-
-                // for the date field, create a few versions of the date
-                // todo : add in a config for custom date format to be added
-                if ($fieldType == 'date') {
-                    // get the friendly date
-                    $friendlyName = $fieldName . "_friendly";
-                    $friendlyDate = date('n/j/Y', $rawData);
-                    $recordUpdate['attributes'][$friendlyName] = $friendlyDate;
-
-                    // get the previous midnight of the current date (unix timestamp)
-                    $midnightName = $fieldName . "_midnight";
-                    $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
-                    $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
-                }
-            }
-
-            $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
-
-            switch ($elementTypeSlug) {
-                case 'category':
-                case 'entry':
-                case 'asset':
-                case 'tag':
-
-                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
-                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
-                    $recordUpdate['attributes']['title'] = $element->title;
-                    break;
-
-                case 'user':
-                    $recordUpdate['elementType'] = 'User';
-                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
-                    $recordUpdate['attributes']['title'] = $element->username;
-                    $recordUpdate['attributes']['firstname'] = $element->firstName;
-                    $recordUpdate['attributes']['lastname'] = $element->lastName;
-                    $recordUpdate['attributes']['email'] = $element->email;
-                    $userGroups = $element->getGroups();
-                    $groupList = [];
-                    foreach ($userGroups AS $group) {
-                        $groupList[] = $group->handle;
-                    }
-                    $recordUpdate['attributes']['userGroups'] = $groupList;
-                    break;
-
-                case 'product':
-
-                    $defaultVariant = $element->defaultVariant;
-
-                    if (isset($defaultVariant) &&  isset($defaultVariant->onSale)) {
-                        $salePrice = (float)$defaultVariant->salePrice;
-                        $onSale = true;
-                    }
-                    else {
-                        $salePrice = null;
-                        $onSale = false;
-                    }
-
-                    AlgoliaSync::$plugin->algoliaSyncService->logger("Product is being loaded", basename(__FILE__) , __LINE__);
-
-                    // get the basic product info
-                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
-                    $recordUpdate['handle'] = $elementInfo['sectionHandle'][0] ?? null;
-                    $recordUpdate['attributes']['title'] = $element->title ?? null;
-
-                    if (isset($element->id)) {
-                        $recordUpdate['attributes']['productId'] = $element->id;
-                    }
-                    if (isset($element->typeId)) {
-                        $recordUpdate['attributes']['typeId'] = $element->typeId;
-                    }
-                    if (isset($element->taxCategoryId)) {
-                        $recordUpdate['attributes']['taxCategoryId'] = $element->taxCategoryId;
-                    }
-                    if (isset($element->shippingCategoryId)) {
-                        $recordUpdate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
-                    }
-                    if (isset($element->defaultSku)) {
-                        $recordUpdate['attributes']['defaultSku'] = $element->defaultSku;
-                    }
-                    if (isset($element->availableForPurchase)) {
-                        $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
-                    }
-                    if (isset($element->defaultVariantId)) {
-                        $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
-                    }
-                    if (isset($element->defaultPrice)) {
-                        $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
-                    }
-                    if (isset($element->defaultWidth)) {
-                        $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
-                    }
-                    if (isset($element->defaultHeight)) {
-                        $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
-                    }
-                    if (isset($element->defaultLength)) {
-                        $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
-                    }
-                    if (isset($element->defaultWeight)) {
-                        $recordUpdate['attributes']['defaultWeight'] = $element->defaultWeight;
-                    }
-                    if (isset($element->taxCategory)) {
-                        $recordUpdate['attributes']['taxCategory'] = $element->taxCategory;
-                    }
-
-
-                    if (isset($elementInfo['productTypeName'])) {
-                        $recordUpdate['attributes']['ProductType'] = $elementInfo['productTypeName'];
-                    }
-
-                    if (isset($onSale)) {
-                        $recordUpdate['attributes']['onSale'] = $onSale; // Assuming $onSale is already a boolean or correct type
-                    }
-                    if (isset($salePrice)) {
-                        $recordUpdate['attributes']['salePrice'] = $salePrice; // Assuming $salePrice is already a number/string or correct type
-                    }
-
-                    // now load all variants
-                    $getAllVariants = \craft\commerce\elements\Variant::find()->productId($element->id);
-
-                    $recordUpdate['attributes']['variants'] = [];
-
-                    foreach ($getAllVariants AS $variantDetails) {
-
-                        $variantInfo = [];
-
-                        $variantInfo['title'] = $variantDetails->title ?? null;
-
-                        $variantInfo['variantId'] = $variantDetails->id ?? null;
-
-                        if (isset($variantDetails->productId)) {
-                            $variantInfo['productId'] = (int)$variantDetails->productId;
-                        }
-                        if (isset($variantDetails->isDefault)) {
-                            $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
-                        }
-                        if (isset($variantDetails->price)) {
-                            $variantInfo['price'] = (float)$variantDetails->price;
-                        }
-                        if (isset($variantDetails->sortOrder)) {
-                            $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
-                        }
-                        if (isset($variantDetails->width)) {
-                            $variantInfo['width'] = (float)$variantDetails->width;
-                        }
-                        if (isset($variantDetails->height)) {
-                            $variantInfo['height'] = (float)$variantDetails->height;
-                        }
-                        if (isset($variantDetails->length)) {
-                            $variantInfo['length'] = (float)$variantDetails->length;
-                        }
-                        if (isset($variantDetails->stock)) {
-                            $variantInfo['stock'] = (int)$variantDetails->stock;
-                        }
-                        if (isset($variantDetails->weight)) {
-                            $variantInfo['weight'] = (float)$variantDetails->weight;
-                        }
-                        if (isset($variantDetails->hasUnlimitedStock)) {
-                            $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
-                        }
-                        if (isset($variantDetails->minQty)) {
-                            $variantInfo['minQty'] = (int)$variantDetails->minQty;
-                        }
-                        if (isset($variantDetails->maxQty)) {
-                            // Note: maxQty might be 0 or null when there's no maximum.
-                            // isset() handles the null case. If 0 is a meaningful value you want,
-                            // this check is still correct as 0 is considered "set".
-                            $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
-                        }
-
-                        // nest each variant under the product info
-                        $recordUpdate['attributes']['variants'][] = $variantInfo;
-
-                    }
-
-                    break;
-
-            }
-
-            // Fire event for tracking before the sync event.
-            $event = new beforeAlgoliaSyncEvent([
-                'recordElement' => $element,
-                'recordUpdate' => $recordUpdate
-            ]);
-
-            $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
-            $recordUpdate = $event->recordUpdate;
-
-            AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord($algoliaAction, $recordUpdate, $algoliaMessage);
+        if (!$this->algoliaElementSynced($element)) {
+            $this->logger("Element not configured for sync: {$element->id}", __FILE__, __LINE__);
+            return;
         }
-        else {
-            AlgoliaSync::$plugin->algoliaSyncService->logger("Not okay to sync...", basename(__FILE__) , __LINE__);
+
+        // Determine insert vs delete
+        $algoliaAction = ($action === 'delete' || !$element->enabled) ? 'delete' : 'insert';
+
+        // Build base payload
+        $recordTemplate = [
+            'attributes'  => [],
+            'index'       => $this->getAlgoliaIndex($element),
+            'elementType' => ucwords($type),
+            'handle'      => $elementInfo['sectionHandle'],
+        ];
+
+        // Core attributes
+        $recordTemplate['attributes']['message']  = (int)$element->id;
+        $recordTemplate['attributes']['slug']     = $element->slug ?? null;
+        $recordTemplate['attributes']['postDate'] = isset($element->postDate) ? (int)$element->postDate->getTimestamp() : null;
+
+        // Handle custom fields
+        if (!empty($element->product)) {
+            $fields = $element->product->getFieldLayout()->getCustomFields();
+        } else {
+            $fields = $element->getFieldLayout()->getCustomFields();
+        }
+        $arrayFieldTypes = ['entries','tags','users'];
+
+        foreach ($fields as $field) {
+            $fieldHandle = $field->handle;
+            $fieldName   = $this->sanitizeFieldName($field->name);
+            $rawData     = $this->getFieldData($element, $field, $fieldHandle);
+
+            if ($rawData instanceof \craft\ckeditor\data\FieldData) {
+                $recordTemplate['attributes'][$fieldName] = $rawData->getRawContent();
+            } elseif (isset($rawData['type']) && in_array($rawData['type'], $arrayFieldTypes)) {
+                $recordTemplate['attributes'][$fieldName]      = $rawData['titles'];
+                $recordTemplate['attributes'][$fieldName . 'Ids'] = $rawData['ids'];
+            } elseif (isset($rawData['type']) && $rawData['type'] === 'mapfield') {
+                $recordTemplate['attributes'][$fieldName]           = $rawData;
+                $recordTemplate['attributes'][$fieldName . '_address'] = $rawData['address'];
+                $recordTemplate['attributes'][$fieldName . '_lat']     = $rawData['lat'];
+                $recordTemplate['attributes'][$fieldName . '_lng']     = $rawData['lng'];
+                $recordTemplate['attributes'][$fieldName . '_zoom']    = $rawData['zoom'];
+                if (!empty($rawData['lat']) && !empty($rawData['lng'])) {
+                    $recordTemplate['attributes']['_geoloc'] = [
+                        'lat' => $rawData['lat'],
+                        'lng' => $rawData['lng'],
+                    ];
+                }
+            } elseif (isset($rawData['type']) && $rawData['type'] === 'categories') {
+                $recordTemplate['attributes'][$fieldName]      = $rawData['flat'];
+                $recordTemplate['attributes'][$fieldName . '_hx'] = $rawData['nested'];
+            } else {
+                $recordTemplate['attributes'][$fieldName] = $rawData;
+            }
+
+            // Date field friendly formats
+            $fieldTypeLong   = get_class($field);
+            $fieldTypeArray  = explode('\\', $fieldTypeLong);
+            $fieldType       = strtolower(array_pop($fieldTypeArray));
+            if ($fieldType === 'date') {
+                $ts                  = $rawData;
+                $friendlyName        = $fieldName . '_friendly';
+                $midnightName        = $fieldName . '_midnight';
+                $recordTemplate['attributes'][$friendlyName] = date('n/j/Y', $ts);
+                $recordTemplate['attributes'][$midnightName] = mktime(0, 0, 0, date('n', $ts), date('j', $ts), date('Y', $ts));
+            }
+        }
+
+        // Determine enabled sites for this element
+        $enabledSites = [];
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $isEnabled = (new Query())
+                ->select('enabled')
+                ->from(['{{%elements_sites}}'])
+                ->where(['elementId' => $element->id, 'siteId' => $site->id])
+                ->scalar();
+            if ($isEnabled == 1) {
+                $enabledSites[$site->id] = $site->handle;
+            }
+        }
+
+        // Fire before-sync event
+        $event = new beforeAlgoliaSyncEvent([
+            'recordElement' => $element,
+            'recordUpdate'  => $recordTemplate,
+        ]);
+        $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
+        $recordTemplate = $event->recordUpdate;
+
+        // Queue a record for each enabled site with a detailed message
+        foreach ($enabledSites as $siteId => $siteHandle) {
+            $record = $recordTemplate;
+            $record['attributes']['objectID']    = "{$element->id}-{$siteId}";
+            $record['attributes']['siteIds']     = [$siteId];
+            $record['attributes']['siteHandles'] = [$siteHandle];
+
+            // grab full title (or username if it’s a user)
+            $title   = $element->title ?? ($element->username ?? 'N/A');
+
+            // truncate to 40 chars, appending "…" if it was longer
+            $maxLen     = 40;
+            $shortTitle = mb_strlen($title) > $maxLen
+                ? mb_substr($title, 0, $maxLen) . '...'
+                : $title;
+
+            $queueMessage = sprintf(
+                'Algolia Sync: [%s] %s "%s" (objectId: %s) queued for Site "%s" (siteId: %d)',
+                ucfirst($algoliaAction),
+                ucwords($type),
+                $shortTitle,
+                "{$element->id}-{$siteId}",
+                $siteHandle,
+                $siteId
+            );
+
+            $this->algoliaSyncRecord($algoliaAction, $record, $queueMessage);
         }
     }
-
     public function sanitizeFieldName($fieldName) {
         $fieldName = preg_replace("/[^A-Za-z0-9 ]/", '', $fieldName);
         return str_replace(' ', '_', $fieldName);
