@@ -951,7 +951,7 @@ class AlgoliaSyncService extends Component
                 : $title;
 
             $queueMessage = sprintf(
-                'Algolia Sync: %s %s "%s (id: %s)" ,Site: "%s (id: %d)",Index "%s"',
+                'Algolia Sync: %s %s "%s (id: %s)", Site: "%s (id: %d)", Index "%s"',
                 $algoliaActionTitle,
                 $type,
                 $shortTitle,
