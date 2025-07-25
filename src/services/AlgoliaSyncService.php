@@ -919,7 +919,7 @@ class AlgoliaSyncService extends Component
                 ->where(['elementId' => $element->id, 'siteId' => $site->id])
                 ->scalar();
             if ($isEnabled == 1) {
-                $enabledSites[$site->id] = $site->handle;
+                $enabledSites[$site->id] = ['handle' => $site->handle, 'language' => $site->language];
             }
         }
 
@@ -932,11 +932,12 @@ class AlgoliaSyncService extends Component
         $recordTemplate = $event->recordUpdate;
 
         // Queue a record for each enabled site with a detailed message
-        foreach ($enabledSites as $siteId => $siteHandle) {
+        foreach ($enabledSites as $siteId => $siteInfo) {
             $record = $recordTemplate;
             $record['attributes']['objectID']    = "{$element->id}-{$siteId}";
-            $record['attributes']['siteIds']     = [$siteId];
-            $record['attributes']['siteHandles'] = [$siteHandle];
+            $record['attributes']['siteId']     = $siteId;
+            $record['attributes']['siteHandle'] = $siteInfo['handle'];
+            $record['attributes']['siteLanguage'] = $siteInfo['language'];
 
             // grab full title (or username if it’s a user)
             $title   = $element->title ?? ($element->username ?? 'N/A');
@@ -953,7 +954,7 @@ class AlgoliaSyncService extends Component
                 ucwords($type),
                 $shortTitle,
                 "{$element->id}-{$siteId}",
-                $siteHandle,
+                $siteInfo['handle'],
                 $siteId
             );
 
