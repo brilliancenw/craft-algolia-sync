@@ -24,74 +24,68 @@ class AlgoliaChunkLoadTask extends BaseJob
     // =========================================================================
 
     /**
-     * [elementType, sectionOrGroupId]
-     * e.g. ['entry', 5] or ['product', 12]
-     * @var array|string
+     * The element type and associated section/group ID.
+     * @var array|string e.g. ['entry', 5]
      */
     public string|array $loadRecordType = [];
 
-    /** @var int Offset into the full list of IDs */
+    /** @var int Offset into list of IDs */
     public int $offset = 0;
 
-    /** @var int How many IDs to process in this chunk */
+    /** @var int Number of IDs to process per chunk */
     public int $limit = 100;
 
     // Public Methods
     // =========================================================================
 
-    /**
-     * Execute a chunk of element IDs, one model per ID, site‑fanout in service.
-     */
     public function execute($queue): void
     {
         Craft::info("Executing AlgoliaChunkLoadTask", __METHOD__);
-        AlgoliaSync::$plugin->algoliaSyncService->logger("Starting chunk: offset={$this->offset}, limit={$this->limit}", basename(__FILE__), __LINE__);
+        AlgoliaSync::$plugin->algoliaSyncService->logger(
+            "Chunk task: offset={$this->offset}, limit={$this->limit}",
+            basename(__FILE__), __LINE__
+        );
 
         list($elementType, $sectionId) = $this->loadRecordType;
         $offset = $this->offset;
         $limit  = $this->limit;
 
+        // Build a site-agnostic base query, stripping default ordering so DISTINCT works
         switch ($elementType) {
-
             case 'product':
-                // commerce products by type ID
                 $query = Product::find()
                     ->typeId($sectionId)
                     ->siteId('*')
+                    ->orderBy([])
                     ->offset($offset)
-                    ->limit($limit)
-                    ->status('enabled');
-
+                    ->limit($limit);
                 break;
 
             case 'entry':
-                // Craft entries by section ID
                 $query = Entry::find()
                     ->sectionId($sectionId)
                     ->siteId('*')
+                    ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
-
                 break;
 
             case 'category':
-                // categories by group ID
                 $query = Category::find()
                     ->groupId($sectionId)
                     ->siteId('*')
+                    ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
-
                 break;
 
             case 'user':
-                // users by group ID
                 $query = User::find()
                     ->groupId($sectionId)
                     ->siteId('*')
+                    ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
-
                 break;
 
             default:
@@ -99,19 +93,20 @@ class AlgoliaChunkLoadTask extends BaseJob
                 return;
         }
 
-        // Get a distinct list of element IDs
+        // Fetch distinct element IDs without ORDER BY conflicts
         $elementIds = $query
             ->distinct()
             ->select(['elements.id'])
             ->column();
 
         $total = count($elementIds);
-        AlgoliaSync::$plugin->algoliaSyncService->logger("Found {$total} distinct {$elementType}(s) in this chunk", basename(__FILE__), __LINE__);
+        AlgoliaSync::$plugin->algoliaSyncService->logger(
+            "Found {$total} distinct {$elementType}(s) in this chunk", basename(__FILE__), __LINE__
+        );
 
-        // Process each ID once
-        $processed = 0;
-        foreach ($elementIds as $id) {
-            $progress = $total > 0 ? ($processed / $total) : 1;
+        // Process each element once
+        foreach ($elementIds as $index => $id) {
+            $progress = $total > 0 ? ($index / $total) : 1;
             $this->setProgress($queue, $progress);
 
             switch ($elementType) {
@@ -127,33 +122,43 @@ class AlgoliaChunkLoadTask extends BaseJob
                 case 'user':
                     $model = User::find()->id($id)->one();
                     break;
-                default:
-                    $model = null;
             }
 
-            if ($model) {
-                AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($model, 'save', "Chunk Load Task processed ID: {$id}");
+            if (!empty($model)) {
+                AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
+                    $model,
+                    'save',
+                    "Sync chunked element ID {$id}"
+                );
             }
-
-            $processed++;
         }
     }
 
     /**
-     * Use a custom description that shows exactly which slice we're syncing.
+     * Default description if none provided.
+     */
+    protected function defaultDescription(): string
+    {
+        list($elementType) = $this->loadRecordType;
+        return Craft::t(
+            'algolia-sync',
+            'Sync {type} chunk',
+            ['type' => ucfirst($elementType)]
+        );
+    }
+
+    /**
+     * Explicitly show slice range in the description.
      */
     public function getDescription(): string
     {
         list($elementType) = $this->loadRecordType;
-        $typeLabel = ucfirst($elementType);
         $start = $this->offset + 1;
         $end   = $this->offset + $this->limit;
         return Craft::t(
             'algolia-sync',
-            'Sync {type} records {start}–{end} to Algolia',
-            ['type' => $typeLabel, 'start' => $start, 'end' => $end]
+            'Sync {type} records {start}–{end}',
+            ['type' => ucfirst($elementType), 'start' => $start, 'end' => $end]
         );
     }
-
-
 }
