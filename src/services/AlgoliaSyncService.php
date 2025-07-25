@@ -243,7 +243,7 @@ class AlgoliaSyncService extends Component
                 'algoliaFunction' => $action,
                 'algoliaObjectID' => $recordUpdate['attributes']['objectID'],
                 'algoliaRecord' => $recordUpdate['attributes'],
-                'algoliaMessage' => $queueMessage
+                'queueMessage' => $queueMessage
             ]));
         }
         AlgoliaSync::$plugin->algoliaSyncService->logger($message, basename(__FILE__) , __LINE__);
