@@ -1,11 +1,55 @@
-/**
- * Algolia Sync plugin for Craft CMS
- *
- * Algolia Sync CSS
- *
- * @author    Mark Middleton
- * @copyright Copyright (c) 2018 Mark Middleton
- * @link      https://www.brilliancenw.com/
- * @package   AlgoliaSync
- * @since     1.0.0
- */
+/* Make the H1 stand out like a proper page title */
+h1.heading {
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #1a1a1a;
+}
+
+/* Style for flash messages */
+.notification {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #34d399;
+    padding: 1rem 1.25rem;
+    border-radius: 4px;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* Improve spacing in fieldsets */
+fieldset.field {
+    margin-bottom: 2rem;
+    border: 1px solid #e5e7eb;
+    padding: 1rem;
+    border-radius: 4px;
+    background-color: #fafafa;
+}
+
+/* Legend styling */
+legend.heading {
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Checkbox labels */
+.checkbox label,
+.checkbox-group label {
+    font-size: 0.95rem;
+    line-height: 1.5rem;
+    cursor: pointer;
+}
+
+/* Buttons group margin */
+div.buttons {
+    margin-top: 2rem;
+}
+
+/* Anchor link formatting */
+a.go {
+    color: #2563eb;
+    text-decoration: underline;
+}
