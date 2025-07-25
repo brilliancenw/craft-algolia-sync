@@ -81,51 +81,69 @@ class AlgoliaSyncService extends Component
 
 
     public function updateAllElements($elementType, $sectionId) {
+        // Loop through each site to support multi-site
+        $allSites = Craft::$app->getSites()->getAllSites();
+        foreach ($allSites as $site) {
+            switch ($elementType) {
+                case 'entry':
+                    $entries = Entry::find()
+                        ->sectionId($sectionId)
+                        ->siteId($site->id)
+                        ->all();
+                    foreach ($entries as $entry) {
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($entry);
+                    }
+                    break;
 
-        SWITCH ($elementType) {
-            CASE 'entry':
-                $entries = Entry::find()->sectionId($sectionId)->all();
-                foreach ($entries AS $entry) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($entry);
-                }
-                break;
+                case 'category':
+                    $categories = Category::find()
+                        ->groupId($sectionId)
+                        ->siteId($site->id)
+                        ->all();
+                    foreach ($categories as $category) {
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($category);
+                    }
+                    break;
 
-            CASE 'category':
-                $categories = Category::find()->groupId($sectionId)->all();
-                foreach ($categories AS $category) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($category);
-                }
-                break;
+                case 'asset':
+                    $assets = Asset::find()
+                        ->volume($sectionId)
+                        ->all();
+                    foreach ($assets as $asset) {
+                        // assets are global; prepare will filter by enabled sites
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($asset);
+                    }
+                    break;
 
-            CASE 'asset':
-                $assets = Asset::find()->volume($sectionId)->all();
-                foreach ($assets AS $asset) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($asset);
-                }
-                break;
+                case 'user':
+                    $allUsers = User::find()
+                        ->groupId($sectionId)
+                        ->all();
+                    foreach ($allUsers as $user) {
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user);
+                    }
+                    break;
 
-            CASE 'user':
-                $allUsers = User::find()->groupId($sectionId)->all();
-                foreach ($allUsers AS $user) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user);
-                }
-                break;
+                case 'tag':
+                    $allTags = Tag::find()
+                        ->groupId($sectionId)
+                        ->siteId($site->id)
+                        ->all();
+                    foreach ($allTags as $tag) {
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($tag);
+                    }
+                    break;
 
-            CASE 'tag':
-                $allTags = Tag::find()->groupId($sectionId)->all();
-                foreach ($allTags AS $tag) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($tag);
-                }
-                break;
-
-            CASE 'product':
-                $allProductTypes = \craft\commerce\elements\Product::find()->typeId($sectionId)->all();
-
-                foreach ($allProductTypes AS $productType) {
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($productType);
-                }
-                break;
-
+                case 'product':
+                    $products = \craft\commerce\elements\Product::find()
+                        ->typeId($sectionId)
+                        ->siteId($site->id)
+                        ->all();
+                    foreach ($products as $product) {
+                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($product);
+                    }
+                    break;
+            }
         }
     }
 
