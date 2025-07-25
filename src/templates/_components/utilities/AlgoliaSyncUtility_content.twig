@@ -24,6 +24,7 @@
 
     <form action="{{ actionUrl('algolia-sync/default/load-records') }}" method="post" id="algoliaSyncLoad">
         {{ csrfInput() }}
+        {{ redirectInput(craft.app.request.url) }}
 
         {% for elementType in supportedElementsConfig %}
             <fieldset class="field">
@@ -33,7 +34,7 @@
                     {% for item in elementType.data %}
                         {% set config = settings['algoliaElements'][elementType.handle][item.value] ?? null %}
                         {% if config and config.sync == '1' %}
-                            <div class="checkbox">
+                            <div>
                                 <label>
                                     <input type="checkbox" class="algoliaLoadCheckbox" name="loadRecords[]" value="{{ elementType.handle }}|{{ item.value }}">
                                     Send all <strong>{{ item.label }}</strong> to sync with Algolia
