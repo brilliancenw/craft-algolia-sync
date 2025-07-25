@@ -846,6 +846,8 @@ class AlgoliaSyncService extends Component
 
         // Determine insert vs delete
         $algoliaAction = ($action === 'delete' || !$element->enabled) ? 'delete' : 'insert';
+        $algoliaActionTitle = ($action === 'delete' || !$element->enabled) ? 'Deleting' : 'Inserting';
+        $algolaiIndexHandle = $this->getAlgoliaIndex($element)[0];
 
         // Build base payload
         $recordTemplate = [
@@ -949,13 +951,14 @@ class AlgoliaSyncService extends Component
                 : $title;
 
             $queueMessage = sprintf(
-                'Algolia Sync: [%s] %s "%s" (objectId: %s) queued for Site "%s" (siteId: %d)',
-                ucfirst($algoliaAction),
-                ucwords($type),
+                'Algolia Sync: %s %s "%s" (objectId: %s) queued for Site "%s" (siteId: %d) to index %s',
+                $algoliaActionTitle,
+                $type,
                 $shortTitle,
                 "{$element->id}-{$siteId}",
                 $siteInfo['handle'],
-                $siteId
+                $siteId,
+                $algolaiIndexHandle
             );
 
             $this->algoliaSyncRecord($algoliaAction, $record, $queueMessage);
