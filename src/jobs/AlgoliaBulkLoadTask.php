@@ -11,210 +11,136 @@
 namespace brilliance\algoliasync\jobs;
 
 use brilliance\algoliasync\AlgoliaSync;
-
 use Craft;
 use craft\queue\BaseJob;
-
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
+use craft\commerce\elements\Product;
 use yii\queue\RetryableJobInterface;
 
 /**
- * AlgoliaSyncTask job
+ * AlgoliaBulkLoadTask
  *
- * Jobs are run in separate process via a Queue of pending jobs. This allows
- * you to spin lengthy processing off into a separate PHP process that does not
- * block the main process.
+ * Breaks a full set of elements into smaller chunks and enqueues each chunk
+ * for processing, preventing timeout issues when sync large data sets.
  *
- * You can use it like this:
- *
- * use brilliance\algoliasync\jobs\AlgoliaSyncTask as AlgoliaSyncTaskJob;
- *
- * $queue = Craft::$app->getQueue();
- * $jobId = $queue->push(new AlgoliaSyncTaskJob([
- *     'description' => Craft::t('algolia-sync', 'This overrides the default description'),
- *     'someAttribute' => 'someValue',
- * ]));
- *
- * The key/value pairs that you pass in to the job will set the public properties
- * for that object. Thus whatever you set 'someAttribute' to will cause the
- * public property $someAttribute to be set in the job.
- *
- * Passing in 'description' is optional, and only if you want to override the default
- * description.
- *
- * More info: https://github.com/yiisoft/yii2-queue
- *
- * @author    Mark Middleton
- * @package   AlgoliaSync
- * @since     1.0.0
- *
- * @property-read mixed $ttr
+ * @package AlgoliaSync
  */
 class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 {
     // Public Properties
     // =========================================================================
 
-
     /**
-     * Some attribute
-     *
-     * @var string
+     * The element type and its associated section/group ID to bulk load.
+     * Example: ['entry', 5] or ['product', 12]
+     * @var array|string
      */
     public string|array $loadRecordType = [];
+
+    /**
+     * Maximum number of items per chunk
+     * @var int
+     */
     public int $standardLimit = 100;
 
     // Public Methods
     // =========================================================================
 
     /**
-     * @inheritDoc
+     * Returns how many seconds this job can run for.
      */
     public function getTtr()
     {
-        return AlgoliaSync::$plugin->getSettings()->queueTtr ?? AlgoliaSync::getInstance()->queue->ttr;
+        return AlgoliaSync::$plugin->getSettings()->queueTtr
+            ?? Craft::$app->getQueue()->ttr;
     }
 
     /**
-     * @inheritDoc
+     * Whether this job can retry on failure, and how many times.
      */
     public function canRetry($attempt, $error): bool
     {
-        $attempts = AlgoliaSync::$plugin->getSettings()->queueMaxRetry ?? AlgoliaSync::getInstance()->queue->attempts;
-        return $attempt < $attempts;
+        $maxAttempts = AlgoliaSync::$plugin->getSettings()->queueMaxRetry
+            ?? Craft::$app->getQueue()->attempts;
+        return $attempt < $maxAttempts;
     }
 
     /**
-     * When the Queue is ready to run your job, it will call this method.
-     * You don't need any steps or any other special logic handling, just do the
-     * jobs that needs to be done here.
-     *
-     * More info: https://github.com/yiisoft/yii2-queue
+     * Executes the bulk load by slicing the full element set into chunks
+     * and enqueuing an AlgoliaChunkLoadTask for each chunk.
      */
     public function execute($queue): void
     {
-        // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
+        list($elementType, $sectionId) = $this->loadRecordType;
 
-        // as an example, you would receive one of the rows below
-        //[0] => [entry][1]
-        //[1] => [entry][6]
-        //[2] => [entry][4]
-        //[3] => [entry][5]
-        //[4] => [user][1]
-
-        AlgoliaSync::$plugin->algoliaSyncService->logger("Executing the Queue", basename(__FILE__) , __LINE__);
-
-        list($elementType,$sectionId) = $this->loadRecordType;
-
-        AlgoliaSync::$plugin->algoliaSyncService->logger("Loading the type of '".$elementType."' with ID #".$sectionId, basename(__FILE__) , __LINE__);
-
-        SWITCH ($elementType) {
-            CASE 'entry':
-
-                // loading too many causes a timeout and memory issue...
-                // breaking these updates into 100 record chunks
-
-                $entryCount = Entry::find()->sectionId($sectionId)->siteId('*')->count();
-
-                $queue = Craft::$app->getQueue();
-
-                for ($x=0; $x<$entryCount; $x=$x+$this->standardLimit) {
-                    $queue->push(new AlgoliaChunkLoadTask([
-                        'description' => Craft::t('algolia-sync', 'Queueing a chunk of records to process start ('.$x.') limit ('.$this->standardLimit.')'),
-                        'loadRecordType' => $this->loadRecordType,
-                        'limit' => $this->standardLimit,
-                        'offset' => $x,
-                        'elementType' => $elementType
-                    ]));
-                }
-
+        // Build a base query across all sites
+        switch ($elementType) {
+            case 'entry':
+                $query = Entry::find()->sectionId($sectionId)->siteId('*');
                 break;
 
-            CASE 'product':
-
-                // loading too many causes a timeout and memory issue...
-                // breaking these updates into 100 record chunks
-
-                $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
-
-                if ($commercePlugin) {
-
-                    // this is the total number of variants in the system
-                    $productCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->siteId('*')->count();
-
-                    AlgoliaSync::$plugin->algoliaSyncService->logger("there are ".$productCount." products to load who match sectionId: ".$sectionId, basename(__FILE__) , __LINE__);
-
-                    $queue = Craft::$app->getQueue();
-
-                    for ($x=0; $x<$productCount; $x=$x+$this->standardLimit) {
-                        $queue->push(new AlgoliaChunkLoadTask([
-                            'description' => Craft::t('algolia-sync', 'Queueing a chunk of '.$elementType.' records to process start ('.$x.') limit ('.$this->standardLimit.')'),
-                            'loadRecordType' => $this->loadRecordType,
-                            'limit' => $this->standardLimit,
-                            'offset' => $x,
-                            'elementType' => $elementType
-                        ]));
-                    }
-                }
-                AlgoliaSync::$plugin->algoliaSyncService->logger("finished AlgoliaBulkLoadTask", basename(__FILE__) , __LINE__);
+            case 'product':
+                $query = Product::find()->typeId($sectionId)->siteId('*');
                 break;
 
-            CASE 'category':
-
-                $categories = Category::find()->groupId($sectionId)->siteId('*')->all();
-
-                $categoryCount = count($categories);
-
-                $currentCategoryNumber = 0;
-
-                // this is probably a poor assumption to think that the quantity of categories
-                // won't time out (like entries or users)
-                // todo : break this into smaller chunks like entries and users
-                foreach ($categories AS $cat) {
-                    $progress = $currentCategoryNumber / $categoryCount;
-                    $this->setProgress($queue, $progress);
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($cat);
-                    $currentCategoryNumber++;
-                }
+            case 'category':
+                $query = Category::find()->groupId($sectionId)->siteId('*');
                 break;
 
-            CASE 'user':
-
-                $userCount = User::find()->groupId($sectionId)->siteId('*')->count();
-
-                $queue = Craft::$app->getQueue();
-
-                for ($x=0; $x<$userCount; $x=$x+$this->standardLimit) {
-                    $progress = $x / $this->standardLimit;
-                    $this->setProgress($queue, $progress);
-
-                    $chunkEnd = $x + $this->standardLimit;
-
-                    $queue->push(new AlgoliaChunkLoadTask([
-                        'description' => Craft::t('algolia-sync', 'Queueing records '.$x.' through '.$chunkEnd.' of a total '.$userCount.' users'),
-                        'loadRecordType' => $this->loadRecordType,
-                        'limit' => $this->standardLimit,
-                        'offset' => $x,
-                        'elementType' => $elementType
-                    ]));
-                }
+            case 'user':
+                $query = User::find()->groupId($sectionId)->siteId('*');
                 break;
+
+            default:
+                Craft::error("Unknown element type: {$elementType}", __METHOD__);
+                return;
+        }
+
+        // Total count of distinct elements
+        $totalCount = $query->count();
+        AlgoliaSync::$plugin->algoliaSyncService->logger(
+            "Bulk load: found {$totalCount} {$elementType}(s) for ID {$sectionId}",
+            basename(__FILE__), __LINE__
+        );
+
+        // Enqueue chunked jobs
+        for ($offset = 0; $offset < $totalCount; $offset += $this->standardLimit) {
+            $start = $offset + 1;
+            $end   = min($offset + $this->standardLimit, $totalCount);
+            $desc  = Craft::t(
+                'algolia-sync',
+                'Queueing chunks of {type} records {start}–{end} for Algolia sync',
+                [
+                    'type'  => ucfirst($elementType),
+                    'start' => $start,
+                    'end'   => $end,
+                ]
+            );
+
+            $queue->push(new AlgoliaChunkLoadTask([
+                'description'    => $desc,
+                'loadRecordType' => $this->loadRecordType,
+                'limit'          => $this->standardLimit,
+                'offset'         => $offset,
+            ]));
         }
     }
 
-
-    // Protected Methods
-    // =========================================================================
-
     /**
-     * Returns a default description for [[getDescription()]], if [[description]] isn’t set.
-     *
-     * @return string The default task description
+     * Fallback description if none provided
      */
     protected function defaultDescription(): string
     {
-        return Craft::t('algolia-sync', 'Algolia Sync');
+        return Craft::t('algolia-sync', 'Algolia Bulk Loader');
+    }
+
+    /**
+     * Show a concise description in the CP
+     */
+    public function getDescription(): string
+    {
+        return $this->description ?: $this->defaultDescription();
     }
 }

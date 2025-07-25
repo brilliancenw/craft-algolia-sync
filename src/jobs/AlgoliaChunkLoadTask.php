@@ -11,184 +11,149 @@
 namespace brilliance\algoliasync\jobs;
 
 use brilliance\algoliasync\AlgoliaSync;
-
 use Craft;
 use craft\queue\BaseJob;
-
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
+use craft\commerce\elements\Product;
 
-/**
- * AlgoliaSyncTask job
- *
- * Jobs are run in separate process via a Queue of pending jobs. This allows
- * you to spin lengthy processing off into a separate PHP process that does not
- * block the main process.
- *
- * You can use it like this:
- *
- * use brilliance\algoliasync\jobs\AlgoliaSyncTask as AlgoliaSyncTaskJob;
- *
- * $queue = Craft::$app->getQueue();
- * $jobId = $queue->push(new AlgoliaSyncTaskJob([
- *     'description' => Craft::t('algolia-sync', 'This overrides the default description'),
- *     'someAttribute' => 'someValue',
- * ]));
- *
- * The key/value pairs that you pass in to the job will set the public properties
- * for that object. Thus whatever you set 'someAttribute' to will cause the
- * public property $someAttribute to be set in the job.
- *
- * Passing in 'description' is optional, and only if you want to override the default
- * description.
- *
- * More info: https://github.com/yiisoft/yii2-queue
- *
- * @author    Mark Middleton
- * @package   AlgoliaSync
- * @since     1.0.0
- */
 class AlgoliaChunkLoadTask extends BaseJob
 {
     // Public Properties
     // =========================================================================
 
     /**
-     * Some attribute
-     *
-     * @var string
+     * [elementType, sectionOrGroupId]
+     * e.g. ['entry', 5] or ['product', 12]
+     * @var array|string
      */
     public string|array $loadRecordType = [];
+
+    /** @var int Offset into the full list of IDs */
     public int $offset = 0;
+
+    /** @var int How many IDs to process in this chunk */
     public int $limit = 100;
-    public string $elementType = '';
 
     // Public Methods
     // =========================================================================
 
-
     /**
-     * When the Queue is ready to run your job, it will call this method.
-     * You don't need any steps or any other special logic handling, just do the
-     * jobs that needs to be done here.
-     *
-     * More info: https://github.com/yiisoft/yii2-queue
+     * Execute a chunk of element IDs, one model per ID, site‑fanout in service.
      */
     public function execute($queue): void
     {
-        // $algoliaSettings = AlgoliaSync::$plugin->getSettings();
+        Craft::info("Executing AlgoliaChunkLoadTask", __METHOD__);
+        AlgoliaSync::$plugin->algoliaSyncService->logger("Starting chunk: offset={$this->offset}, limit={$this->limit}", basename(__FILE__), __LINE__);
 
-        Craft::info("Executing the Queue", "algolia-sync");
+        list($elementType, $sectionId) = $this->loadRecordType;
+        $offset = $this->offset;
+        $limit  = $this->limit;
 
-        AlgoliaSync::$plugin->algoliaSyncService->logger("Create a chunck load task", basename(__FILE__) , __LINE__);
+        switch ($elementType) {
 
-        // as an example, you would receive one of the rows below
-        //[0] => [entry][1]
-        //[1] => [entry][6]
-        //[2] => [entry][4]
-        //[3] => [entry][5]
-        //[4] => [user][1]
-
-        list($elementType,$sectionId) = $this->loadRecordType;
-        $offsetCount = $this->offset;
-        $limitCount = $this->limit;
-
-        SWITCH ($elementType) {
-
-            CASE 'product':
-
-                AlgoliaSync::$plugin->algoliaSyncService->logger("loading a chunk of products (with type ID = ".$sectionId.") into the Algolia sync queue.  OffsetCount=".$offsetCount.", limitCount=".$limitCount, basename(__FILE__) , __LINE__);
-
-                $commercePlugin = Craft::$app->plugins->getPlugin('commerce');
-
-                if ($commercePlugin) {
-
-                    $recordCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->status('enabled')->count();
-                    $products = \craft\commerce\elements\Product::find()->typeId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->status('enabled')->all();
-
-                    if ($recordCount > 0) {
-                        AlgoliaSync::$plugin->algoliaSyncService->logger("We found ".$recordCount." products that need to be synced in this batch to be synced", basename(__FILE__) , __LINE__);
-
-                        $currentLoopCount = 0;
-                        foreach ($products as $product) {
-                            $progress = $currentLoopCount / $recordCount;
-                            $this->setProgress($queue, $progress);
-
-                            AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($product);
-                            $currentLoopCount++;
-                        }
-                    }
-                }
-                break;
-
-            CASE 'entry':
-
-                // loading too many causes a timeout and memory issue...
-                // what if we run some smaller loaders to execute a little block at a time?
-                // then we can run an infinite number!
-                $entryCount = Entry::find()->sectionId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->count();
-
-                if ($entryCount > 0) {
-                    $entries = Entry::find()->sectionId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->all();
-
-                    $recordCount = count($entries);
-                    $currentLoopCount = 0;
-                    foreach ($entries AS $entry) {
-                        $progress = $currentLoopCount / $recordCount;
-                        $this->setProgress($queue, $progress);
-                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($entry);
-                        $currentLoopCount++;
-                    }
-                }
-
+            case 'product':
+                // commerce products by type ID
+                $query = Product::find()
+                    ->typeId($sectionId)
+                    ->siteId('*')
+                    ->offset($offset)
+                    ->limit($limit)
+                    ->status('enabled');
 
                 break;
 
-            CASE 'category':
+            case 'entry':
+                // Craft entries by section ID
+                $query = Entry::find()
+                    ->sectionId($sectionId)
+                    ->siteId('*')
+                    ->offset($offset)
+                    ->limit($limit);
 
-                $categories = Category::find()->groupId($sectionId)->siteId('*')->all();
-                $recordCount = count($categories);
-                $currentLoopCount = 0;
-                foreach ($categories AS $cat) {
-                    $progress = $currentLoopCount / $recordCount;
-                    $this->setProgress($queue, $progress);
-                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($cat);
-                    $currentLoopCount++;
-                }
                 break;
 
-            CASE 'user':
-                $blockOfUsers = User::find()->groupId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->all();
+            case 'category':
+                // categories by group ID
+                $query = Category::find()
+                    ->groupId($sectionId)
+                    ->siteId('*')
+                    ->offset($offset)
+                    ->limit($limit);
 
-                $recordCount = count($blockOfUsers);
-                $currentLoopCount = 0;
-                $duplicateCheck = [];
-
-                foreach ($blockOfUsers AS $user) {
-                    $userId = $user->id;
-                    if (!in_array($userId, $duplicateCheck)) {
-                        $duplicateCheck[] = $userId;
-                        $progress = $currentLoopCount / $recordCount;
-                        $this->setProgress($queue, $progress);
-                        AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($user, 'save', 'Chunk Load Task Line: '.__LINE__);
-                        $currentLoopCount++;
-                    }
-                }
                 break;
+
+            case 'user':
+                // users by group ID
+                $query = User::find()
+                    ->groupId($sectionId)
+                    ->siteId('*')
+                    ->offset($offset)
+                    ->limit($limit);
+
+                break;
+
+            default:
+                Craft::error("Unknown elementType: {$elementType}", __METHOD__);
+                return;
+        }
+
+        // Get a distinct list of element IDs
+        $elementIds = $query
+            ->distinct()
+            ->select(['elements.id'])
+            ->column();
+
+        $total = count($elementIds);
+        AlgoliaSync::$plugin->algoliaSyncService->logger("Found {$total} distinct {$elementType}(s) in this chunk", basename(__FILE__), __LINE__);
+
+        // Process each ID once
+        $processed = 0;
+        foreach ($elementIds as $id) {
+            $progress = $total > 0 ? ($processed / $total) : 1;
+            $this->setProgress($queue, $progress);
+
+            switch ($elementType) {
+                case 'product':
+                    $model = Product::find()->id($id)->one();
+                    break;
+                case 'entry':
+                    $model = Entry::find()->id($id)->one();
+                    break;
+                case 'category':
+                    $model = Category::find()->id($id)->one();
+                    break;
+                case 'user':
+                    $model = User::find()->id($id)->one();
+                    break;
+                default:
+                    $model = null;
+            }
+
+            if ($model) {
+                AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($model, 'save', "Chunk Load Task processed ID: {$id}");
+            }
+
+            $processed++;
         }
     }
 
-    // Protected Methods
-    // =========================================================================
-
     /**
-     * Returns a default description for [[getDescription()]], if [[description]] isn’t set.
-     *
-     * @return string The default task description
+     * Use a custom description that shows exactly which slice we're syncing.
      */
-    protected function defaultDescription(): string
+    public function getDescription(): string
     {
-        return Craft::t('algolia-sync', 'Algolia Chunked Task');
+        list($elementType) = $this->loadRecordType;
+        $typeLabel = ucfirst($elementType);
+        $start = $this->offset + 1;
+        $end   = $this->offset + $this->limit;
+        return Craft::t(
+            'algolia-sync',
+            'Sync {type} records {start}–{end} to Algolia',
+            ['type' => $typeLabel, 'start' => $start, 'end' => $end]
+        );
     }
+
+
 }
