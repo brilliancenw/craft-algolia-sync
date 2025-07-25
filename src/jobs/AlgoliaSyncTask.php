@@ -47,8 +47,14 @@ class AlgoliaSyncTask extends BaseJob
         }
     }
 
+    public function getDescription(): string
+    {
+        return $this->queueMessage ?: Craft::t('algolia-sync', 'Algolia Sync Task');
+    }
+
     protected function defaultDescription(): string
     {
-        return Craft::t('algolia-sync', 'Algolia Sync Task');
+        return $this->queueMessage ?: Craft::t('algolia-sync', 'Algolia Sync Task');
     }
+
 }
