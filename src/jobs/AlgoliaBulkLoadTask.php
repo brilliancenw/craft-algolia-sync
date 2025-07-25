@@ -116,7 +116,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 // loading too many causes a timeout and memory issue...
                 // breaking these updates into 100 record chunks
 
-                $entryCount = Entry::find()->sectionId($sectionId)->count();
+                $entryCount = Entry::find()->sectionId($sectionId)->siteId('*')->count();
 
                 $queue = Craft::$app->getQueue();
 
@@ -142,7 +142,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 if ($commercePlugin) {
 
                     // this is the total number of variants in the system
-                    $productCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->count();
+                    $productCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->siteId('*')->count();
 
                     AlgoliaSync::$plugin->algoliaSyncService->logger("there are ".$productCount." products to load who match sectionId: ".$sectionId, basename(__FILE__) , __LINE__);
 
@@ -163,7 +163,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 
             CASE 'category':
 
-                $categories = Category::find()->groupId($sectionId)->all();
+                $categories = Category::find()->groupId($sectionId)->siteId('*')->all();
 
                 $categoryCount = count($categories);
 
@@ -182,7 +182,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
 
             CASE 'user':
 
-                $userCount = User::find()->groupId($sectionId)->count();
+                $userCount = User::find()->groupId($sectionId)->siteId('*')->count();
 
                 $queue = Craft::$app->getQueue();
 

@@ -104,8 +104,8 @@ class AlgoliaChunkLoadTask extends BaseJob
 
                 if ($commercePlugin) {
 
-                    $recordCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->count();
-                    $products = \craft\commerce\elements\Product::find()->typeId($sectionId)->offset($offsetCount)->limit($limitCount)->status('enabled')->all();
+                    $recordCount = \craft\commerce\elements\Product::find()->typeId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->status('enabled')->count();
+                    $products = \craft\commerce\elements\Product::find()->typeId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->status('enabled')->all();
 
                     if ($recordCount > 0) {
                         AlgoliaSync::$plugin->algoliaSyncService->logger("We found ".$recordCount." products that need to be synced in this batch to be synced", basename(__FILE__) , __LINE__);
@@ -127,10 +127,10 @@ class AlgoliaChunkLoadTask extends BaseJob
                 // loading too many causes a timeout and memory issue...
                 // what if we run some smaller loaders to execute a little block at a time?
                 // then we can run an infinite number!
-                $entryCount = Entry::find()->sectionId($sectionId)->offset($offsetCount)->limit($limitCount)->count();
+                $entryCount = Entry::find()->sectionId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->count();
 
                 if ($entryCount > 0) {
-                    $entries = Entry::find()->sectionId($sectionId)->offset($offsetCount)->limit($limitCount)->all();
+                    $entries = Entry::find()->sectionId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->all();
 
                     $recordCount = count($entries);
                     $currentLoopCount = 0;
@@ -147,7 +147,7 @@ class AlgoliaChunkLoadTask extends BaseJob
 
             CASE 'category':
 
-                $categories = Category::find()->groupId($sectionId)->all();
+                $categories = Category::find()->groupId($sectionId)->siteId('*')->all();
                 $recordCount = count($categories);
                 $currentLoopCount = 0;
                 foreach ($categories AS $cat) {
@@ -159,7 +159,7 @@ class AlgoliaChunkLoadTask extends BaseJob
                 break;
 
             CASE 'user':
-                $blockOfUsers = User::find()->groupId($sectionId)->offset($offsetCount)->limit($limitCount)->all();
+                $blockOfUsers = User::find()->groupId($sectionId)->siteId('*')->offset($offsetCount)->limit($limitCount)->all();
 
                 $recordCount = count($blockOfUsers);
                 $currentLoopCount = 0;
