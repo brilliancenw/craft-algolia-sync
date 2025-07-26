@@ -944,6 +944,8 @@ class AlgoliaSyncService extends Component
             // grab full title (or username if it’s a user)
             $title   = $element->title ?? ($element->username ?? 'N/A');
 
+            $record['attributes']['title'] = $title;
+
             // truncate to 40 chars, appending "…" if it was longer
             $maxLen     = 40;
             $shortTitle = mb_strlen($title) > $maxLen
