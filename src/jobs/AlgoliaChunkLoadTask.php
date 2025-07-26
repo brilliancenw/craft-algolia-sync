@@ -24,8 +24,8 @@ class AlgoliaChunkLoadTask extends BaseJob
     // =========================================================================
 
     /**
-     * The element type and associated section/group ID.
-     * @var array|string e.g. ['entry', 5]
+     * The element type and associated section/group ID (e.g. ['entry', 5]).
+     * @var array|string
      */
     public string|array $loadRecordType = [];
 
@@ -38,9 +38,12 @@ class AlgoliaChunkLoadTask extends BaseJob
     // Public Methods
     // =========================================================================
 
+    /**
+     * Executes a chunk of element IDs, loading each model once and syncing per site.
+     */
     public function execute($queue): void
     {
-        Craft::info("Executing AlgoliaChunkLoadTask", __METHOD__);
+        Craft::info('Executing AlgoliaChunkLoadTask', __METHOD__);
         AlgoliaSync::$plugin->algoliaSyncService->logger(
             "Chunk task: offset={$this->offset}, limit={$this->limit}",
             basename(__FILE__), __LINE__
@@ -50,7 +53,7 @@ class AlgoliaChunkLoadTask extends BaseJob
         $offset = $this->offset;
         $limit  = $this->limit;
 
-        // Build a site-agnostic base query, stripping default ordering so DISTINCT works
+        // Build a site-agnostic query for distinct IDs
         switch ($elementType) {
             case 'product':
                 $query = Product::find()
@@ -93,7 +96,7 @@ class AlgoliaChunkLoadTask extends BaseJob
                 return;
         }
 
-        // Fetch distinct element IDs without ORDER BY conflicts
+        // Get distinct element IDs
         $elementIds = $query
             ->distinct()
             ->select(['elements.id'])
@@ -104,23 +107,24 @@ class AlgoliaChunkLoadTask extends BaseJob
             "Found {$total} distinct {$elementType}(s) in this chunk", basename(__FILE__), __LINE__
         );
 
-        // Process each element once
+        // Process each ID once
         foreach ($elementIds as $index => $id) {
             $progress = $total > 0 ? ($index / $total) : 1;
             $this->setProgress($queue, $progress);
 
+            // Load the model by ID across all sites
             switch ($elementType) {
                 case 'product':
-                    $model = Product::find()->id($id)->one();
+                    $model = Product::find()->id($id)->siteId('*')->one();
                     break;
                 case 'entry':
-                    $model = Entry::find()->id($id)->one();
+                    $model = Entry::find()->id($id)->siteId('*')->one();
                     break;
                 case 'category':
-                    $model = Category::find()->id($id)->one();
+                    $model = Category::find()->id($id)->siteId('*')->one();
                     break;
                 case 'user':
-                    $model = User::find()->id($id)->one();
+                    $model = User::find()->id($id)->siteId('*')->one();
                     break;
             }
 
@@ -148,7 +152,7 @@ class AlgoliaChunkLoadTask extends BaseJob
     }
 
     /**
-     * Explicitly show slice range in the description.
+     * Show slice range in the CP description.
      */
     public function getDescription(): string
     {
