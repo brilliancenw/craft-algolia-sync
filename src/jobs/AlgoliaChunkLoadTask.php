@@ -132,7 +132,7 @@ class AlgoliaChunkLoadTask extends BaseJob
                 AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
                     $model,
                     'save',
-                    "Sync chunked element ID {$id}"
+                    null
                 );
             }
         }
