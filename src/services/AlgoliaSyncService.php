@@ -917,16 +917,18 @@ class AlgoliaSyncService extends Component
         }
 
         // Determine which sites to sync
-        if ($action === 'bulk') {
-            $siteId = $element->siteId;
+// Only sync the current site when bulk‑loading or saving
+        if ($action === 'bulk' || $action === 'save') {
+            $siteId    = $element->siteId;
             $siteModel = Craft::$app->getSites()->getSiteById($siteId);
             $enabledSites = [
                 $siteId => [
-                    'handle' => $siteModel->handle,
+                    'handle'   => $siteModel->handle,
                     'language' => $siteModel->language,
                 ],
             ];
         } else {
+            // For delete or other actions, fall back to “all enabled sites”
             $enabledSites = [];
             foreach (Craft::$app->getSites()->getAllSites() as $site) {
                 $isEnabled = (new Query())
@@ -936,12 +938,13 @@ class AlgoliaSyncService extends Component
                     ->scalar();
                 if ($isEnabled == 1) {
                     $enabledSites[$site->id] = [
-                        'handle' => $site->handle,
+                        'handle'   => $site->handle,
                         'language' => $site->language,
                     ];
                 }
             }
         }
+
 
         // Fire before-sync event
         $event = new beforeAlgoliaSyncEvent([
