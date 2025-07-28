@@ -78,19 +78,19 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
         // Build a base query across all sites
         switch ($elementType) {
             case 'entry':
-                $query = Entry::find()->sectionId($sectionId)->siteId('*');
+                $query = Entry::find()->sectionId($sectionId)->site('*');
                 break;
 
             case 'product':
-                $query = Product::find()->typeId($sectionId)->siteId('*');
+                $query = Product::find()->typeId($sectionId)->site('*');
                 break;
 
             case 'category':
-                $query = Category::find()->groupId($sectionId)->siteId('*');
+                $query = Category::find()->groupId($sectionId)->site('*');
                 break;
 
             case 'user':
-                $query = User::find()->groupId($sectionId)->siteId('*');
+                $query = User::find()->groupId($sectionId)->site('*');
                 break;
 
             default:

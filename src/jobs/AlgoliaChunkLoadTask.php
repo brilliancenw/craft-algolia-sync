@@ -59,7 +59,7 @@ class AlgoliaChunkLoadTask extends BaseJob
             case 'product':
                 $query = Product::find()
                     ->typeId($sectionId)
-                    ->siteId('*')
+                    ->site('*')
                     ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
@@ -68,7 +68,7 @@ class AlgoliaChunkLoadTask extends BaseJob
             case 'entry':
                 $query = Entry::find()
                     ->sectionId($sectionId)
-                    ->siteId('*')
+                    ->site('*')
                     ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
@@ -77,7 +77,7 @@ class AlgoliaChunkLoadTask extends BaseJob
             case 'category':
                 $query = Category::find()
                     ->groupId($sectionId)
-                    ->siteId('*')
+                    ->site('*')
                     ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
@@ -86,7 +86,7 @@ class AlgoliaChunkLoadTask extends BaseJob
             case 'user':
                 $query = User::find()
                     ->groupId($sectionId)
-                    ->siteId('*')
+                    ->site('*')
                     ->orderBy([])
                     ->offset($offset)
                     ->limit($limit);
@@ -146,16 +146,16 @@ class AlgoliaChunkLoadTask extends BaseJob
             // Use the specific element type to query for all site versions
             switch ($elementType) {
                 case 'product':
-                    $allSites = Product::find()->id($id)->siteId('*')->all();
+                    $allSites = Product::find()->id($id)->site('*')->all();
                     break;
                 case 'entry':
-                    $allSites = Entry::find()->id($id)->siteId('*')->all();
+                    $allSites = Entry::find()->id($id)->site('*')->all();
                     break;
                 case 'category':
-                    $allSites = Category::find()->id($id)->siteId('*')->all();
+                    $allSites = Category::find()->id($id)->site('*')->all();
                     break;
                 case 'user':
-                    $allSites = User::find()->id($id)->siteId('*')->all();
+                    $allSites = User::find()->id($id)->site('*')->all();
                     break;
             }
 
