@@ -165,7 +165,7 @@ class AlgoliaChunkLoadTask extends BaseJob
                     $message = "Sync chunked element ID {$id} for site {$siteSpecificElement->site->handle}";
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
                         $siteSpecificElement,
-                        'save',
+                        'bulk',
                         $message
                     );
                 }

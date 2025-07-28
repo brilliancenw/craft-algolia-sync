@@ -832,6 +832,7 @@ class AlgoliaSyncService extends Component
 //        }
 //    }
 
+
     public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '')
     {
         // Gather element info and short-circuit if not synced
@@ -844,128 +845,140 @@ class AlgoliaSyncService extends Component
             return;
         }
 
-        // Determine insert vs delete
-        $algoliaAction = ($action === 'delete' || !$element->enabled) ? 'delete' : 'insert';
-        $algoliaActionTitle = ($action === 'delete' || !$element->enabled) ? 'Deleting' : 'Inserting';
-        $algolaiIndexHandle = $this->getAlgoliaIndex($element)[0];
+        // Determine Algolia action
+        $isDelete = ($action === 'delete' || !$element->enabled);
+        $algoliaAction = $isDelete ? 'delete' : 'insert';
+        $algoliaActionTitle = $isDelete ? 'Deleting' : 'Inserting';
+        $algoliaIndexHandle = $this->getAlgoliaIndex($element)[0];
 
         // Build base payload
         $recordTemplate = [
-            'attributes'  => [],
-            'index'       => $this->getAlgoliaIndex($element),
+            'attributes' => [],
+            'index' => $this->getAlgoliaIndex($element),
             'elementType' => ucwords($type),
-            'handle'      => $elementInfo['sectionHandle'],
+            'handle' => $elementInfo['sectionHandle'],
         ];
+        $recordTemplate['attributes']['message'] = (int)$element->id;
+        $recordTemplate['attributes']['slug'] = $element->slug ?? null;
+        $recordTemplate['attributes']['postDate'] = isset($element->postDate)
+            ? (int)$element->postDate->getTimestamp()
+            : null;
 
-        // Core attributes
-        $recordTemplate['attributes']['message']  = (int)$element->id;
-        $recordTemplate['attributes']['slug']     = $element->slug ?? null;
-        $recordTemplate['attributes']['postDate'] = isset($element->postDate) ? (int)$element->postDate->getTimestamp() : null;
-
-        // Handle custom fields
+        // Gather custom field values
         if (!empty($element->product)) {
             $fields = $element->product->getFieldLayout()->getCustomFields();
         } else {
             $fields = $element->getFieldLayout()->getCustomFields();
         }
-        $arrayFieldTypes = ['entries','tags','users'];
+        $arrayFieldTypes = ['entries', 'tags', 'users'];
 
         foreach ($fields as $field) {
-            $fieldHandle = $field->handle;
-            $fieldName   = $this->sanitizeFieldName($field->name);
-            $rawData     = $this->getFieldData($element, $field, $fieldHandle);
+            $handle = $field->handle;
+            $name = $this->sanitizeFieldName($field->name);
+            $raw = $this->getFieldData($element, $field, $handle);
 
-            if ($rawData instanceof \craft\ckeditor\data\FieldData) {
-                $recordTemplate['attributes'][$fieldName] = $rawData->getRawContent();
-            } elseif (isset($rawData['type']) && in_array($rawData['type'], $arrayFieldTypes)) {
-                $recordTemplate['attributes'][$fieldName]      = $rawData['titles'];
-                $recordTemplate['attributes'][$fieldName . 'Ids'] = $rawData['ids'];
-            } elseif (isset($rawData['type']) && $rawData['type'] === 'mapfield') {
-                $recordTemplate['attributes'][$fieldName]           = $rawData;
-                $recordTemplate['attributes'][$fieldName . '_address'] = $rawData['address'];
-                $recordTemplate['attributes'][$fieldName . '_lat']     = $rawData['lat'];
-                $recordTemplate['attributes'][$fieldName . '_lng']     = $rawData['lng'];
-                $recordTemplate['attributes'][$fieldName . '_zoom']    = $rawData['zoom'];
-                if (!empty($rawData['lat']) && !empty($rawData['lng'])) {
+            if ($raw instanceof \craft\ckeditor\data\FieldData) {
+                $recordTemplate['attributes'][$name] = $raw->getRawContent();
+            } elseif (isset($raw['type']) && in_array($raw['type'], $arrayFieldTypes)) {
+                $recordTemplate['attributes'][$name] = $raw['titles'];
+                $recordTemplate['attributes'][$name . 'Ids'] = $raw['ids'];
+            } elseif (isset($raw['type']) && $raw['type'] === 'mapfield') {
+                $recordTemplate['attributes'][$name] = $raw;
+                $recordTemplate['attributes'][$name . '_address'] = $raw['address'];
+                $recordTemplate['attributes'][$name . '_lat'] = $raw['lat'];
+                $recordTemplate['attributes'][$name . '_lng'] = $raw['lng'];
+                $recordTemplate['attributes'][$name . '_zoom'] = $raw['zoom'];
+                if (!empty($raw['lat']) && !empty($raw['lng'])) {
                     $recordTemplate['attributes']['_geoloc'] = [
-                        'lat' => $rawData['lat'],
-                        'lng' => $rawData['lng'],
+                        'lat' => $raw['lat'],
+                        'lng' => $raw['lng'],
                     ];
                 }
-            } elseif (isset($rawData['type']) && $rawData['type'] === 'categories') {
-                $recordTemplate['attributes'][$fieldName]      = $rawData['flat'];
-                $recordTemplate['attributes'][$fieldName . '_hx'] = $rawData['nested'];
+            } elseif (isset($raw['type']) && $raw['type'] === 'categories') {
+                $recordTemplate['attributes'][$name] = $raw['flat'];
+                $recordTemplate['attributes'][$name . '_hx'] = $raw['nested'];
             } else {
-                $recordTemplate['attributes'][$fieldName] = $rawData;
+                $recordTemplate['attributes'][$name] = $raw;
             }
 
-            // Date field friendly formats
-            $fieldTypeLong   = get_class($field);
-            $fieldTypeArray  = explode('\\', $fieldTypeLong);
-            $fieldType       = strtolower(array_pop($fieldTypeArray));
+            // Friendly date formats
+            $classParts = explode('\\', get_class($field));
+            $fieldType = strtolower(end($classParts));
             if ($fieldType === 'date') {
-                $ts                  = $rawData;
-                $friendlyName        = $fieldName . '_friendly';
-                $midnightName        = $fieldName . '_midnight';
-                $recordTemplate['attributes'][$friendlyName] = date('n/j/Y', $ts);
-                $recordTemplate['attributes'][$midnightName] = mktime(0, 0, 0, date('n', $ts), date('j', $ts), date('Y', $ts));
+                $ts = $raw;
+                $recordTemplate['attributes'][$name . '_friendly'] = date('n/j/Y', $ts);
+                $recordTemplate['attributes'][$name . '_midnight'] = mktime(
+                    0, 0, 0,
+                    date('n', $ts),
+                    date('j', $ts),
+                    date('Y', $ts)
+                );
             }
         }
 
-        // Determine enabled sites for this element
-        $enabledSites = [];
-        foreach (Craft::$app->getSites()->getAllSites() as $site) {
-            $isEnabled = (new Query())
-                ->select('enabled')
-                ->from(['{{%elements_sites}}'])
-                ->where(['elementId' => $element->id, 'siteId' => $site->id])
-                ->scalar();
-            if ($isEnabled == 1) {
-                $enabledSites[$site->id] = ['handle' => $site->handle, 'language' => $site->language];
+        // Determine which sites to sync
+        if ($action === 'bulk') {
+            $siteId = $element->siteId;
+            $siteModel = Craft::$app->getSites()->getSiteById($siteId);
+            $enabledSites = [
+                $siteId => [
+                    'handle' => $siteModel->handle,
+                    'language' => $siteModel->language,
+                ],
+            ];
+        } else {
+            $enabledSites = [];
+            foreach (Craft::$app->getSites()->getAllSites() as $site) {
+                $isEnabled = (new Query())
+                    ->select('enabled')
+                    ->from('{{%elements_sites}}')
+                    ->where(['elementId' => $element->id, 'siteId' => $site->id])
+                    ->scalar();
+                if ($isEnabled == 1) {
+                    $enabledSites[$site->id] = [
+                        'handle' => $site->handle,
+                        'language' => $site->language,
+                    ];
+                }
             }
         }
 
         // Fire before-sync event
         $event = new beforeAlgoliaSyncEvent([
             'recordElement' => $element,
-            'recordUpdate'  => $recordTemplate,
+            'recordUpdate' => $recordTemplate,
         ]);
         $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
         $recordTemplate = $event->recordUpdate;
 
-        // Queue a record for each enabled site with a detailed message
-        foreach ($enabledSites as $siteId => $siteInfo) {
+        // Queue a record per site
+        foreach ($enabledSites as $siteId => $info) {
             $record = $recordTemplate;
-            $record['attributes']['objectID']    = "{$element->id}-{$siteId}";
-            $record['attributes']['siteId']     = $siteId;
-            $record['attributes']['siteHandle'] = $siteInfo['handle'];
-            $record['attributes']['siteLanguage'] = $siteInfo['language'];
+            $record['attributes']['objectID'] = "{$element->id}-{$siteId}";
+            $record['attributes']['siteId'] = $siteId;
+            $record['attributes']['siteHandle'] = $info['handle'];
+            $record['attributes']['siteLanguage'] = $info['language'];
 
-            // grab full title (or username if it’s a user)
-            $title   = $element->title ?? ($element->username ?? 'N/A');
-
+            $title = $element->title ?? ($element->username ?? 'N/A');
             $record['attributes']['title'] = $title;
-
-            // truncate to 40 chars, appending "…" if it was longer
-            $maxLen     = 40;
-            $shortTitle = mb_strlen($title) > $maxLen
-                ? mb_substr($title, 0, $maxLen) . '...'
-                : $title;
+            $max = 40;
+            $short = mb_strlen($title) > $max ? mb_substr($title, 0, $max) . '...' : $title;
 
             $queueMessage = sprintf(
                 'Algolia Sync: %s %s "%s (id: %s)", Site: "%s (id: %d)", Index "%s"',
                 $algoliaActionTitle,
                 $type,
-                $shortTitle,
+                $short,
                 "{$element->id}-{$siteId}",
-                $siteInfo['handle'],
+                $info['handle'],
                 $siteId,
-                $algolaiIndexHandle
+                $algoliaIndexHandle
             );
 
             $this->algoliaSyncRecord($algoliaAction, $record, $queueMessage);
         }
     }
+
     public function sanitizeFieldName($fieldName) {
         $fieldName = preg_replace("/[^A-Za-z0-9 ]/", '', $fieldName);
         return str_replace(' ', '_', $fieldName);
