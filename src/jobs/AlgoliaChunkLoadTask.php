@@ -138,19 +138,35 @@ class AlgoliaChunkLoadTask extends BaseJob
 //            }
 //        }
         // Process each ID once
+        // Process each ID once
         foreach ($elementIds as $index => $id) {
-            $progress = $total > 0 ? ($index / $total) : 1;
-            $this->setProgress($queue, $progress);
+            $this->setProgress($queue, ($index + 1) / $total);
+            $allSites = [];
 
-            // Get all sites the element is enabled for
-            $allSites = Element::find()->id($id)->siteId('*')->all();
+            // Use the specific element type to query for all site versions
+            switch ($elementType) {
+                case 'product':
+                    $allSites = Product::find()->id($id)->siteId('*')->all();
+                    break;
+                case 'entry':
+                    $allSites = Entry::find()->id($id)->siteId('*')->all();
+                    break;
+                case 'category':
+                    $allSites = Category::find()->id($id)->siteId('*')->all();
+                    break;
+                case 'user':
+                    $allSites = User::find()->id($id)->siteId('*')->all();
+                    break;
+            }
 
+            // Loop through the site-specific elements and queue them for syncing
             foreach ($allSites as $siteSpecificElement) {
-                if (!empty($siteSpecificElement)) {
+                if ($siteSpecificElement) {
+                    $message = "Sync chunked element ID {$id} for site {$siteSpecificElement->site->handle}";
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
                         $siteSpecificElement,
                         'save',
-                        "Sync chunked element ID {$id} for site {$siteSpecificElement->site->handle}"
+                        $message
                     );
                 }
             }
