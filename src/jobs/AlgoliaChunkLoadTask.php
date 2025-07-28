@@ -13,6 +13,7 @@ namespace brilliance\algoliasync\jobs;
 use brilliance\algoliasync\AlgoliaSync;
 use Craft;
 use craft\queue\BaseJob;
+use craft\base\Element;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
@@ -108,32 +109,50 @@ class AlgoliaChunkLoadTask extends BaseJob
         );
 
         // Process each ID once
+//        foreach ($elementIds as $index => $id) {
+//            $progress = $total > 0 ? ($index / $total) : 1;
+//            $this->setProgress($queue, $progress);
+//
+//            // Load the model by ID across all sites
+//            switch ($elementType) {
+//                case 'product':
+//                    $model = Product::find()->id($id)->siteId('*')->one();
+//                    break;
+//                case 'entry':
+//                    $model = Entry::find()->id($id)->siteId('*')->one();
+//                    break;
+//                case 'category':
+//                    $model = Category::find()->id($id)->siteId('*')->one();
+//                    break;
+//                case 'user':
+//                    $model = User::find()->id($id)->siteId('*')->one();
+//                    break;
+//            }
+//
+//            if (!empty($model)) {
+//                AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
+//                    $model,
+//                    'save',
+//                    "Sync chunked element ID {$id}"
+//                );
+//            }
+//        }
+        // Process each ID once
         foreach ($elementIds as $index => $id) {
             $progress = $total > 0 ? ($index / $total) : 1;
             $this->setProgress($queue, $progress);
 
-            // Load the model by ID across all sites
-            switch ($elementType) {
-                case 'product':
-                    $model = Product::find()->id($id)->siteId('*')->one();
-                    break;
-                case 'entry':
-                    $model = Entry::find()->id($id)->siteId('*')->one();
-                    break;
-                case 'category':
-                    $model = Category::find()->id($id)->siteId('*')->one();
-                    break;
-                case 'user':
-                    $model = User::find()->id($id)->siteId('*')->one();
-                    break;
-            }
+            // Get all sites the element is enabled for
+            $allSites = Element::find()->id($id)->siteId('*')->all();
 
-            if (!empty($model)) {
-                AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
-                    $model,
-                    'save',
-                    "Sync chunked element ID {$id}"
-                );
+            foreach ($allSites as $siteSpecificElement) {
+                if (!empty($siteSpecificElement)) {
+                    AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement(
+                        $siteSpecificElement,
+                        'save',
+                        "Sync chunked element ID {$id} for site {$siteSpecificElement->site->handle}"
+                    );
+                }
             }
         }
     }
