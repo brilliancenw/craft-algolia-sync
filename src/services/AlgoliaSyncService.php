@@ -85,6 +85,7 @@ class AlgoliaSyncService extends Component
         $allSites = Craft::$app->getSites()->getAllSites();
         foreach ($allSites as $site) {
             switch ($elementType) {
+
                 case 'entry':
                     $entries = Entry::find()
                         ->sectionId($sectionId)
@@ -140,6 +141,8 @@ class AlgoliaSyncService extends Component
                         ->siteId($site->id)
                         ->all();
                     foreach ($products as $product) {
+                        print "this is a product";
+                            exit;
                         AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($product);
                     }
                     break;
@@ -838,6 +841,7 @@ class AlgoliaSyncService extends Component
         // Gather element info and short-circuit if not synced
         $elementInfo = $this->getEventElementInfo($element);
         $type = $elementInfo['type'];
+
         $this->logger("Preparing sync for {$type} ID {$element->id}", __FILE__, __LINE__);
 
         if (!$this->algoliaElementSynced($element)) {
@@ -865,9 +869,133 @@ class AlgoliaSyncService extends Component
             : null;
 
         // Gather custom field values
-        if (!empty($element->product)) {
-            $fields = $element->product->getFieldLayout()->getCustomFields();
+        if ($type === 'product') {
+
+            $defaultVariant = $element->defaultVariant;
+
+            if (isset($defaultVariant) &&  isset($defaultVariant->onSale)) {
+                $salePrice = (float)$defaultVariant->salePrice;
+                $onSale = true;
+            }
+            else {
+                $salePrice = null;
+                $onSale = false;
+            }
+
+            AlgoliaSync::$plugin->algoliaSyncService->logger("Product is being loaded", basename(__FILE__) , __LINE__);
+
+            // get the basic product info
+            $recordTemplate['elementType'] = ucwords($type);
+            $recordTemplate['handle'] = $elementInfo['sectionHandle'][0] ?? null;
+            $recordTemplate['attributes']['title'] = $element->title ?? null;
+
+            if (isset($element->id)) {
+                $recordTemplate['attributes']['productId'] = $element->id;
+            }
+            if (isset($element->typeId)) {
+                $recordTemplate['attributes']['typeId'] = $element->typeId;
+            }
+            if (isset($element->taxCategoryId)) {
+                $recordTemplate['attributes']['taxCategoryId'] = $element->taxCategoryId;
+            }
+            if (isset($element->shippingCategoryId)) {
+                $recordTemplate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
+            }
+            if (isset($element->defaultSku)) {
+                $recordTemplate['attributes']['defaultSku'] = $element->defaultSku;
+            }
+            if (isset($element->availableForPurchase)) {
+                $recordTemplate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
+            }
+            if (isset($element->defaultVariantId)) {
+                $recordTemplate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
+            }
+            if (isset($element->defaultPrice)) {
+                $recordTemplate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
+            }
+            if (isset($element->defaultWidth)) {
+                $recordTemplate['attributes']['defaultWidth'] = $element->defaultWidth;
+            }
+            if (isset($element->defaultHeight)) {
+                $recordTemplate['attributes']['defaultHeight'] = $element->defaultHeight;
+            }
+            if (isset($element->defaultLength)) {
+                $recordTemplate['attributes']['defaultLength'] = $element->defaultLength;
+            }
+            if (isset($element->defaultWeight)) {
+                $recordTemplate['attributes']['defaultWeight'] = $element->defaultWeight;
+            }
+            if (isset($element->taxCategory)) {
+                $recordTemplate['attributes']['taxCategory'] = $element->taxCategory;
+            }
+            if (isset($elementInfo['productTypeName'])) {
+                $recordTemplate['attributes']['ProductType'] = $elementInfo['productTypeName'];
+            }
+            if (isset($onSale)) {
+                $recordTemplate['attributes']['onSale'] = $onSale; // Assuming $onSale is already a boolean or correct type
+            }
+            if (isset($salePrice)) {
+                $recordTemplate['attributes']['salePrice'] = $salePrice; // Assuming $salePrice is already a number/string or correct type
+            }
+
+            // now load all variants
+            $getAllVariants = \craft\commerce\elements\Variant::find()->productId($element->id);
+
+            $recordTemplate['attributes']['variants'] = [];
+
+            foreach ($getAllVariants AS $variantDetails) {
+
+                $variantInfo = [];
+
+                $variantInfo['title'] = $variantDetails->title ?? null;
+
+                $variantInfo['variantId'] = $variantDetails->id ?? null;
+
+                if (isset($variantDetails->productId)) {
+                    $variantInfo['productId'] = (int)$variantDetails->productId;
+                }
+                if (isset($variantDetails->isDefault)) {
+                    $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
+                }
+                if (isset($variantDetails->price)) {
+                    $variantInfo['price'] = (float)$variantDetails->price;
+                }
+                if (isset($variantDetails->sortOrder)) {
+                    $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
+                }
+                if (isset($variantDetails->width)) {
+                    $variantInfo['width'] = (float)$variantDetails->width;
+                }
+                if (isset($variantDetails->height)) {
+                    $variantInfo['height'] = (float)$variantDetails->height;
+                }
+                if (isset($variantDetails->length)) {
+                    $variantInfo['length'] = (float)$variantDetails->length;
+                }
+                if (isset($variantDetails->stock)) {
+                    $variantInfo['stock'] = (int)$variantDetails->stock;
+                }
+                if (isset($variantDetails->weight)) {
+                    $variantInfo['weight'] = (float)$variantDetails->weight;
+                }
+                if (isset($variantDetails->hasUnlimitedStock)) {
+                    $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
+                }
+                if (isset($variantDetails->minQty)) {
+                    $variantInfo['minQty'] = (int)$variantDetails->minQty;
+                }
+                if (isset($variantDetails->maxQty)) {
+                    // Note: maxQty might be 0 or null when there's no maximum.
+                    // isset() handles the null case. If 0 is a meaningful value you want,
+                    // this check is still correct as 0 is considered "set".
+                    $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
+                }
+                // nest each variant under the product info
+                $recordTemplate['attributes']['variants'][] = $variantInfo;
+            }
+            $fields = $element->getFieldLayout()->getCustomFields();
         } else {
+
             $fields = $element->getFieldLayout()->getCustomFields();
         }
         $arrayFieldTypes = ['entries', 'tags', 'users'];
@@ -917,7 +1045,7 @@ class AlgoliaSyncService extends Component
         }
 
         // Determine which sites to sync
-// Only sync the current site when bulk‑loading or saving
+        // Only sync the current site when bulk‑loading or saving
         if ($action === 'bulk' || $action === 'save') {
             $siteId    = $element->siteId;
             $siteModel = Craft::$app->getSites()->getSiteById($siteId);
