@@ -166,12 +166,13 @@ class AlgoliaSyncService extends Component
 
             // at this point, we should remove the product from the index - we don't know if it was already there...
             $algoliaIndex = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+            $objectID = $this->generateObjectID($element);
 
             $queue = Craft::$app->getQueue();
             $queue->push(new AlgoliaSyncTask([
                 'algoliaIndex' => $algoliaIndex,
                 'algoliaFunction' => 'delete',
-                'algoliaObjectID' => $element->id.'-'.$element->siteId,
+                'algoliaObjectID' => $objectID,
                 'algoliaRecord' => [],
                 'algoliaMessage' => "Item is not enabled, confirming it's removed from Algolia"
             ]));
@@ -1080,7 +1081,11 @@ class AlgoliaSyncService extends Component
         // Queue a record per site
         foreach ($enabledSites as $siteId => $info) {
             $record = $recordTemplate;
-            $record['attributes']['objectID'] = "{$element->id}-{$siteId}";
+
+            // Generate objectID using centralized helper
+            $objectID = $this->generateObjectID($element, $siteId);
+
+            $record['attributes']['objectID'] = $objectID;
             $record['attributes']['siteId'] = $siteId;
             $record['attributes']['siteHandle'] = $info['handle'];
             $record['attributes']['siteLanguage'] = $info['language'];
@@ -1095,13 +1100,60 @@ class AlgoliaSyncService extends Component
                 $algoliaActionTitle,
                 $type,
                 $short,
-                "{$element->id}-{$siteId}",
+                $objectID,
                 $info['handle'],
                 $siteId,
                 $algoliaIndexHandle
             );
 
             $this->algoliaSyncRecord($algoliaAction, $record, $queueMessage);
+
+            // Cleanup: When deleting from default site, also delete the alternate format
+            // This ensures old records are removed when the setting changes
+            $defaultSiteId = Craft::$app->getSites()->getPrimarySite()->id;
+            $isDefaultSite = ($siteId == $defaultSiteId);
+            $appendSuffix = AlgoliaSync::$plugin->settings->appendSiteIdToDefaultSite;
+
+            if ($algoliaAction === 'delete' && $isDefaultSite) {
+                $alternateObjectID = $appendSuffix
+                    ? (string)$element->id  // If we just deleted "123-1", also delete "123"
+                    : "{$element->id}-{$siteId}";  // If we just deleted "123", also delete "123-1"
+
+                $alternateRecord = $record;
+                $alternateRecord['attributes']['objectID'] = $alternateObjectID;
+
+                $alternateQueueMessage = sprintf(
+                    'Algolia Sync: Cleanup - Deleting alternate format "%s" for %s, Site: "%s (id: %d)", Index "%s"',
+                    $alternateObjectID,
+                    $type,
+                    $info['handle'],
+                    $siteId,
+                    $algoliaIndexHandle
+                );
+
+                $this->algoliaSyncRecord('delete', $alternateRecord, $alternateQueueMessage);
+            }
+        }
+    }
+
+    /**
+     * Generate the Algolia objectID for an element based on site and settings
+     *
+     * @param Element $element The element to generate objectID for
+     * @param int|null $siteId Optional site ID (uses element's siteId if not provided)
+     * @return string The objectID (e.g., "123" or "123-1")
+     */
+    public function generateObjectID($element, ?int $siteId = null): string
+    {
+        $siteId = $siteId ?? $element->siteId;
+        $defaultSiteId = Craft::$app->getSites()->getPrimarySite()->id;
+        $isDefaultSite = ($siteId == $defaultSiteId);
+        $appendSuffix = AlgoliaSync::$plugin->settings->appendSiteIdToDefaultSite;
+
+        if ($isDefaultSite && !$appendSuffix) {
+            return (string)$element->id;
+        } else {
+            return "{$element->id}-{$siteId}";
         }
     }
 
@@ -1229,7 +1281,7 @@ class AlgoliaSyncService extends Component
                         $elementData = [];
                         $elementData['index'] = AlgoliaSync::$plugin->algoliaSyncService->getSyncedMemberGroups();
                         $elementData['attributes'] = [];
-                        $elementData['attributes']['objectID'] = $element->id.'-'.$element->siteId;
+                        $elementData['attributes']['objectID'] = $this->generateObjectID($element);
 
                         AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord('delete', $elementData);
                     }

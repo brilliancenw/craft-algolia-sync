@@ -44,6 +44,7 @@ class Settings extends Model
     public string $algoliaApp = '';              // ALGOLIA_APP
     public string $algoliaSearch = ''; // ALGOLIA_SEARCH
     public array $algoliaElements = []; // sections, categories, usergroups, etc...
+    public bool $appendSiteIdToDefaultSite = false; // append site ID to default site objectIDs
 
     public function getAlgoliaAdmin(): string
     {

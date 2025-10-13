@@ -63,6 +63,18 @@
 
 
 <hr>
+<h1>Multi-Site Options</h1>
+
+{{ forms.lightswitchField({
+    label: 'Append Site ID to Default Site Object IDs',
+    instructions: 'When enabled, the default site will use object IDs in the format "123-1". When disabled, the default site will use "123" format for backward compatibility. Note: Changing this setting will create new records in Algolia. You may need to manually remove old records.',
+    warning: 'Changing this setting after initial setup may result in duplicate records in Algolia until old records are manually removed.',
+    id: 'appendSiteIdToDefaultSite',
+    name: 'appendSiteIdToDefaultSite',
+    on: settings.appendSiteIdToDefaultSite ?? false,
+}) }}
+
+<hr>
 <h1>Bulk Load of Records</h1>
 <a href="{{ cpUrl('utilities/algolia-sync-utility') }}">Visit the Utilities Page to Bulk Load Records</a>
 
