@@ -1056,20 +1056,15 @@ class AlgoliaSyncService extends Component
                 ],
             ];
         } else {
-            // For delete or other actions, fall back to “all enabled sites”
+            // For delete or other actions, process ALL sites
+            // When deleting/disabling, the element may not be "enabled" in Craft anymore,
+            // but it may still exist in Algolia and needs to be removed
             $enabledSites = [];
             foreach (Craft::$app->getSites()->getAllSites() as $site) {
-                $isEnabled = (new Query())
-                    ->select('enabled')
-                    ->from('{{%elements_sites}}')
-                    ->where(['elementId' => $element->id, 'siteId' => $site->id])
-                    ->scalar();
-                if ($isEnabled == 1) {
-                    $enabledSites[$site->id] = [
-                        'handle'   => $site->handle,
-                        'language' => $site->language,
-                    ];
-                }
+                $enabledSites[$site->id] = [
+                    'handle'   => $site->handle,
+                    'language' => $site->language,
+                ];
             }
         }
 
