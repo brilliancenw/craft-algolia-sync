@@ -59,30 +59,37 @@ class AlgoliaCleanupBatchJob extends BaseJob
         $total = count($this->objectIDs);
         $processed = 0;
 
-        // Parse objectIDs to get element IDs
-        $elementIds = [];
-        $objectIDMap = []; // elementId => [objectIDs]
+        // Parse objectIDs to get element IDs and site IDs
+        // Map: "elementId-siteId" => [objectIDs]
+        $elementSiteMap = [];
 
         foreach ($this->objectIDs as $objectID) {
-            // Parse objectID to get element ID (e.g., "123" or "123-1")
+            // Parse objectID to get element ID and site ID (e.g., "123" or "123-1")
             $parts = explode('-', $objectID);
             $elementId = (int)$parts[0];
+            $siteId = isset($parts[1]) ? (int)$parts[1] : null;
 
-            if (!isset($objectIDMap[$elementId])) {
-                $objectIDMap[$elementId] = [];
+            // Create a key combining elementId and siteId
+            $key = $siteId ? "{$elementId}-{$siteId}" : (string)$elementId;
+
+            if (!isset($elementSiteMap[$key])) {
+                $elementSiteMap[$key] = [
+                    'elementId' => $elementId,
+                    'siteId' => $siteId,
+                    'objectIDs' => []
+                ];
             }
-            $objectIDMap[$elementId][] = $objectID;
-            $elementIds[] = $elementId;
+            $elementSiteMap[$key]['objectIDs'][] = $objectID;
         }
 
-        $elementIds = array_unique($elementIds);
+        // Check each element in its specific site context
+        foreach ($elementSiteMap as $key => $data) {
+            $elementId = $data['elementId'];
+            $siteId = $data['siteId'];
+            $objectIDs = $data['objectIDs'];
 
-        // Query Craft for these elements
-        $elements = $this->queryElements($elementIds);
-
-        // Check each objectID
-        foreach ($objectIDMap as $elementId => $objectIDs) {
-            $element = $elements[$elementId] ?? null;
+            // Query element for this specific site
+            $element = $this->queryElement($elementId, $siteId);
 
             foreach ($objectIDs as $objectID) {
                 $processed++;
@@ -107,80 +114,66 @@ class AlgoliaCleanupBatchJob extends BaseJob
     }
 
     /**
-     * Query Craft elements by their IDs
+     * Query a single Craft element by ID for a specific site
      *
-     * @param array $elementIds
-     * @return array Indexed by element ID
+     * @param int $elementId
+     * @param int|null $siteId Site ID, or null for default site
+     * @return \craft\base\ElementInterface|null
      */
-    protected function queryElements(array $elementIds): array
+    protected function queryElement(int $elementId, ?int $siteId)
     {
-        $elements = [];
+        // If no siteId specified, use the primary site
+        if ($siteId === null) {
+            $siteId = Craft::$app->getSites()->getPrimarySite()->id;
+        }
+
+        $query = null;
 
         switch ($this->elementType) {
             case 'entry':
-                // Use siteId('*') to get elements from all sites, then use unique() to get one per ID
-                $elements = Entry::find()
-                    ->id($elementIds)
+                $query = Entry::find()
+                    ->id($elementId)
                     ->sectionId($this->sectionId)
-                    ->siteId('*')
-                    ->status(null) // Include all statuses
-                    ->unique()
-                    ->all();
+                    ->siteId($siteId)
+                    ->status(null); // Include all statuses
                 break;
 
             case 'category':
-                $elements = Category::find()
-                    ->id($elementIds)
+                $query = Category::find()
+                    ->id($elementId)
                     ->groupId($this->sectionId)
-                    ->siteId('*')
-                    ->status(null)
-                    ->unique()
-                    ->all();
+                    ->siteId($siteId)
+                    ->status(null);
                 break;
 
             case 'asset':
-                $elements = Asset::find()
-                    ->id($elementIds)
+                $query = Asset::find()
+                    ->id($elementId)
                     ->volumeId($this->sectionId)
-                    ->siteId('*')
-                    ->status(null)
-                    ->unique()
-                    ->all();
+                    ->siteId($siteId)
+                    ->status(null);
                 break;
 
             case 'user':
-                $elements = User::find()
-                    ->id($elementIds)
+                // Users don't have site-specific versions
+                $query = User::find()
+                    ->id($elementId)
                     ->groupId($this->sectionId)
-                    ->status(null)
-                    ->all();
+                    ->status(null);
                 break;
 
             case 'product':
                 if (class_exists('craft\\commerce\\elements\\Product')) {
-                    $elements = \craft\commerce\elements\Product::find()
-                        ->id($elementIds)
+                    $query = \craft\commerce\elements\Product::find()
+                        ->id($elementId)
                         ->typeId($this->sectionId)
-                        ->siteId('*')
-                        ->status(null)
-                        ->unique()
-                        ->all();
-                } else {
-                    $elements = [];
+                        ->siteId($siteId)
+                        ->status(null);
                 }
                 break;
-
-            default:
-                $elements = [];
         }
 
-        // Index by element ID
-        $indexed = [];
-        foreach ($elements as $element) {
-            $indexed[$element->id] = $element;
-        }
-
-        return $indexed;
+        return $query ? $query->one() : null;
     }
 
     /**
