@@ -851,7 +851,14 @@ class AlgoliaSyncService extends Component
         }
 
         // Determine Algolia action
-        $isDelete = ($action === 'delete' || !$element->enabled);
+        // Check if element is expired
+        $isExpired = false;
+        if (isset($element->expiryDate) && $element->expiryDate instanceof \DateTime) {
+            $now = new \DateTime();
+            $isExpired = ($element->expiryDate < $now);
+        }
+
+        $isDelete = ($action === 'delete' || !$element->enabled || $isExpired);
         $algoliaAction = $isDelete ? 'delete' : 'insert';
         $algoliaActionTitle = $isDelete ? 'Deleting' : 'Inserting';
         $algoliaIndexHandle = $this->getAlgoliaIndex($element)[0];
@@ -1439,5 +1446,354 @@ class AlgoliaSyncService extends Component
             $log = date('Y-m-d H:i:s').' ['.$filename.':'.$linenumber.'] '.$message."\n";
             FileHelper::writeToFile($file, $log, ['append' => true]);
         }
+    }
+
+    /**
+     * Clean up stale records in Algolia (deleted, disabled, or expired elements)
+     * Returns statistics about what was found
+     *
+     * @return array ['totalChecked' => int, 'totalStale' => int, 'results' => array]
+     */
+    public function cleanupStaleRecords(): array
+    {
+        $settings = AlgoliaSync::$plugin->getSettings();
+        $algoliaAppId = $settings->getAlgoliaApp();
+        $algoliaApiKey = $settings->getAlgoliaAdmin();
+
+        if (!$algoliaAppId || !$algoliaApiKey) {
+            throw new \Exception('Algolia API credentials not configured');
+        }
+
+        $client = \Algolia\AlgoliaSearch\Api\SearchClient::create($algoliaAppId, $algoliaApiKey);
+
+        // Get all configured element types and their indexes
+        $elementsToCheck = $this->getConfiguredElementsForCleanup();
+
+        if (empty($elementsToCheck)) {
+            return ['totalChecked' => 0, 'totalStale' => 0, 'results' => []];
+        }
+
+        $totalChecked = 0;
+        $totalStale = 0;
+        $results = [];
+
+        foreach ($elementsToCheck as $elementConfig) {
+            try {
+                $result = $this->checkIndexForStaleRecords(
+                    $client,
+                    $elementConfig['index'],
+                    $elementConfig['type'],
+                    $elementConfig['sectionId']
+                );
+
+                $totalChecked += $result['checked'];
+                $totalStale += $result['stale'];
+
+                $results[] = [
+                    'type' => $elementConfig['type'],
+                    'label' => $elementConfig['label'],
+                    'index' => $elementConfig['index'],
+                    'checked' => $result['checked'],
+                    'stale' => $result['stale'],
+                    'error' => null,
+                ];
+            } catch (\Throwable $e) {
+                // Index doesn't exist or other error - log and continue
+                Craft::warning("Skipping index {$elementConfig['index']}: " . $e->getMessage(), __METHOD__);
+
+                $errorMessage = $e->getMessage();
+                // Make "does not exist" errors clearer by adding "in Algolia"
+                if (strpos($errorMessage, 'does not exist') !== false) {
+                    $errorMessage = str_replace('does not exist', 'does not exist in Algolia', $errorMessage);
+                }
+
+                $results[] = [
+                    'type' => $elementConfig['type'],
+                    'label' => $elementConfig['label'],
+                    'index' => $elementConfig['index'],
+                    'checked' => 0,
+                    'stale' => 0,
+                    'error' => $errorMessage,
+                ];
+            }
+        }
+
+        return [
+            'totalChecked' => $totalChecked,
+            'totalStale' => $totalStale,
+            'results' => $results,
+        ];
+    }
+
+    /**
+     * Check a single Algolia index for stale records
+     *
+     * @param \Algolia\AlgoliaSearch\Api\SearchClient $client
+     * @param string $indexName
+     * @param string $elementType
+     * @param int $sectionId
+     * @return array ['checked' => int, 'stale' => int]
+     */
+    protected function checkIndexForStaleRecords($client, string $indexName, string $elementType, int $sectionId): array
+    {
+        $checked = 0;
+        $stale = 0;
+        $batch = [];
+        $batchSize = 100;
+
+        // Browse all records in the index
+        $browseParams = ['attributesToRetrieve' => ['objectID']];
+
+        foreach ($client->browseObjects($indexName, $browseParams) as $hit) {
+            if (!isset($hit['objectID'])) {
+                continue;
+            }
+
+            $checked++;
+            $objectID = $hit['objectID'];
+
+            // Parse objectID to get element ID and site ID
+            $parts = explode('-', $objectID);
+            $elementId = (int)$parts[0];
+            $siteId = isset($parts[1]) ? (int)$parts[1] : null;
+
+            $batch[] = [
+                'objectID' => $objectID,
+                'elementId' => $elementId,
+                'siteId' => $siteId,
+            ];
+
+            // Process batch when it reaches the size limit
+            if (count($batch) >= $batchSize) {
+                $stale += $this->processBatchForCleanup($batch, $elementType, $sectionId, $indexName);
+                $batch = [];
+            }
+        }
+
+        // Process remaining batch
+        if (!empty($batch)) {
+            $stale += $this->processBatchForCleanup($batch, $elementType, $sectionId, $indexName);
+        }
+
+        return ['checked' => $checked, 'stale' => $stale];
+    }
+
+    /**
+     * Process a batch of Algolia records and queue deletions for stale ones
+     *
+     * @param array $batch
+     * @param string $elementType
+     * @param int $sectionId
+     * @param string $indexName
+     * @return int Number of stale records found
+     */
+    protected function processBatchForCleanup(array $batch, string $elementType, int $sectionId, string $indexName): int
+    {
+        $elementIds = array_column($batch, 'elementId');
+        $staleCount = 0;
+
+        // Query Craft for these elements (all statuses)
+        $elements = $this->queryElementsForCleanup($elementType, $sectionId, $elementIds);
+
+        // Check each record in the batch
+        foreach ($batch as $record) {
+            $elementId = $record['elementId'];
+            $objectID = $record['objectID'];
+            $element = $elements[$elementId] ?? null;
+
+            $shouldDelete = false;
+            $reason = '';
+
+            if (!$element) {
+                $shouldDelete = true;
+                $reason = 'deleted';
+            } elseif (!$element->enabled) {
+                $shouldDelete = true;
+                $reason = 'disabled';
+            } elseif (isset($element->expiryDate) && $element->expiryDate instanceof \DateTime) {
+                $now = new \DateTime();
+                if ($element->expiryDate < $now) {
+                    $shouldDelete = true;
+                    $reason = 'expired';
+                }
+            }
+
+            if ($shouldDelete) {
+                $queue = Craft::$app->getQueue();
+                $queue->push(new \brilliance\algoliasync\jobs\AlgoliaSyncTask([
+                    'algoliaIndex' => [$indexName],
+                    'algoliaFunction' => 'delete',
+                    'algoliaObjectID' => $objectID,
+                    'algoliaRecord' => [],
+                    'queueMessage' => "Cleanup: Deleting stale record {$objectID} (reason: {$reason})"
+                ]));
+                $staleCount++;
+            }
+        }
+
+        return $staleCount;
+    }
+
+    /**
+     * Query Craft elements by type and IDs for cleanup
+     *
+     * @param string $elementType
+     * @param int $sectionId
+     * @param array $elementIds
+     * @return array Indexed by element ID
+     */
+    protected function queryElementsForCleanup(string $elementType, int $sectionId, array $elementIds): array
+    {
+        $query = null;
+
+        switch ($elementType) {
+            case 'entry':
+                $query = Entry::find()
+                    ->id($elementIds)
+                    ->sectionId($sectionId)
+                    ->status(null)
+                    ->indexBy('id');
+                break;
+
+            case 'category':
+                $query = Category::find()
+                    ->id($elementIds)
+                    ->groupId($sectionId)
+                    ->status(null)
+                    ->indexBy('id');
+                break;
+
+            case 'asset':
+                $query = Asset::find()
+                    ->id($elementIds)
+                    ->volume($sectionId)
+                    ->status(null)
+                    ->indexBy('id');
+                break;
+
+            case 'user':
+                $query = User::find()
+                    ->id($elementIds)
+                    ->groupId($sectionId)
+                    ->status(null)
+                    ->indexBy('id');
+                break;
+
+            case 'product':
+                if (class_exists('craft\commerce\elements\Product')) {
+                    $query = \craft\commerce\elements\Product::find()
+                        ->id($elementIds)
+                        ->typeId($sectionId)
+                        ->status(null)
+                        ->indexBy('id');
+                }
+                break;
+        }
+
+        return $query ? $query->all() : [];
+    }
+
+    /**
+     * Get all configured elements that should be checked for cleanup
+     *
+     * @return array
+     */
+    protected function getConfiguredElementsForCleanup(): array
+    {
+        $settings = AlgoliaSync::$plugin->getSettings();
+        $elements = [];
+
+        if (empty($settings->algoliaElements)) {
+            return [];
+        }
+
+        foreach ($settings->algoliaElements as $type => $configs) {
+            foreach ($configs as $sectionId => $config) {
+                if (empty($config['sync'])) {
+                    continue;
+                }
+
+                $indexName = $config['customIndex'] ?? null;
+                if (empty($indexName)) {
+                    // Generate default index name
+                    $env = $this->getEnvironment();
+                    $handle = $this->getSectionHandleForCleanup($type, $sectionId);
+                    $indexName = "{$env}_{$type}_{$handle}";
+                }
+
+                $elements[] = [
+                    'type' => $type,
+                    'sectionId' => $sectionId,
+                    'index' => App::parseEnv($indexName),
+                    'label' => $this->getSectionLabelForCleanup($type, $sectionId),
+                ];
+            }
+        }
+
+        return $elements;
+    }
+
+    /**
+     * Get section handle by type and ID for cleanup
+     *
+     * @param string $type
+     * @param int $sectionId
+     * @return string
+     */
+    protected function getSectionHandleForCleanup(string $type, int $sectionId): string
+    {
+        switch ($type) {
+            case 'entry':
+                $section = Craft::$app->entries->getSectionById($sectionId);
+                return $section ? $section->handle : 'unknown';
+            case 'category':
+                $group = Craft::$app->categories->getGroupById($sectionId);
+                return $group ? $group->handle : 'unknown';
+            case 'asset':
+                $volume = Craft::$app->volumes->getVolumeById($sectionId);
+                return $volume ? $volume->handle : 'unknown';
+            case 'user':
+                $group = Craft::$app->userGroups->getGroupById($sectionId);
+                return $group ? $group->handle : 'unknown';
+            case 'product':
+                if (Craft::$app->plugins->isPluginEnabled('commerce')) {
+                    $productType = \craft\commerce\Plugin::getInstance()->getProductTypes()->getProductTypeById($sectionId);
+                    return $productType ? $productType->handle : 'unknown';
+                }
+                break;
+        }
+        return 'unknown';
+    }
+
+    /**
+     * Get section label by type and ID for cleanup
+     *
+     * @param string $type
+     * @param int $sectionId
+     * @return string
+     */
+    protected function getSectionLabelForCleanup(string $type, int $sectionId): string
+    {
+        switch ($type) {
+            case 'entry':
+                $section = Craft::$app->entries->getSectionById($sectionId);
+                return $section ? $section->name : 'Unknown Section';
+            case 'category':
+                $group = Craft::$app->categories->getGroupById($sectionId);
+                return $group ? $group->name : 'Unknown Group';
+            case 'asset':
+                $volume = Craft::$app->volumes->getVolumeById($sectionId);
+                return $volume ? $volume->name : 'Unknown Volume';
+            case 'user':
+                $group = Craft::$app->userGroups->getGroupById($sectionId);
+                return $group ? $group->name : 'Unknown Group';
+            case 'product':
+                if (Craft::$app->plugins->isPluginEnabled('commerce')) {
+                    $productType = \craft\commerce\Plugin::getInstance()->getProductTypes()->getProductTypeById($sectionId);
+                    return $productType ? $productType->name : 'Unknown Type';
+                }
+                break;
+        }
+        return 'Unknown';
     }
 }

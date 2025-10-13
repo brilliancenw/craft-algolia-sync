@@ -57,3 +57,45 @@
         </div>
     </form>
 </div>
+
+<hr>
+
+<div class="pane">
+    <h1 class="heading">Cleanup Stale Records in Algolia</h1>
+
+    <p class="light">
+        This will check all records in your configured Algolia indexes and remove any that are:
+    </p>
+    <ul class="light">
+        <li>Deleted from Craft</li>
+        <li>Disabled in Craft</li>
+        <li>Expired (expiry date has passed)</li>
+    </ul>
+    <p>
+        The cleanup process scans all records efficiently in batches and queues deletions for stale records.
+    </p>
+
+    <form action="{{ actionUrl('algolia-sync/default/cleanup-stale-records') }}" method="post" id="algoliaCleanupStale">
+        {{ csrfInput() }}
+        {{ redirectInput(craft.app.request.url) }}
+
+        <div class="buttons">
+            <button type="submit" class="btn submit">Cleanup Stale Records</button>
+        </div>
+    </form>
+
+    <hr>
+
+    <h2 class="heading">Automate with Cron</h2>
+    <p class="light">
+        For automatic cleanup of expired records, set up a cron job to run the cleanup command regularly:
+    </p>
+    <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto;"><code># Run daily at 2:00 AM
+0 2 * * * cd /path/to/project && php craft algolia-sync/default/cleanup-stale-records
+
+# Run every 6 hours
+0 */6 * * * cd /path/to/project && php craft algolia-sync/default/cleanup-stale-records</code></pre>
+    <p class="light">
+        Replace <code>/path/to/project</code> with your actual project path.
+    </p>
+</div>
