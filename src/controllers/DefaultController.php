@@ -115,32 +115,14 @@ class DefaultController extends Controller
         try {
             $result = AlgoliaSync::$plugin->algoliaSyncService->cleanupStaleRecords();
 
-            $message = "Cleanup complete! Checked {$result['totalChecked']} records, found {$result['totalStale']} stale records and queued them for deletion.";
-
-            $hasDetails = false;
-            $detailsHtml = "<br><br>Details:<ul>";
-
-            foreach ($result['results'] as $indexResult) {
-                if (isset($indexResult['error']) && $indexResult['error']) {
-                    $detailsHtml .= "<li><strong>{$indexResult['label']}</strong>: <em>Skipped - {$indexResult['error']}</em></li>";
-                    $hasDetails = true;
-                } elseif ($indexResult['stale'] > 0) {
-                    $detailsHtml .= "<li><strong>{$indexResult['label']}</strong>: {$indexResult['stale']} stale records found</li>";
-                    $hasDetails = true;
-                }
+            if ($result['queued']) {
+                $message = $result['message'] . ' Check the queue for progress.';
+                Craft::$app->getSession()->setNotice($message);
             }
-
-            $detailsHtml .= "</ul>";
-
-            if ($hasDetails) {
-                $message .= $detailsHtml;
-            }
-
-            Craft::$app->getSession()->setFlash('yourVariable', $message);
 
         } catch (\Throwable $e) {
-            Craft::error("Error during Algolia cleanup: " . $e->getMessage(), __METHOD__);
-            Craft::$app->getSession()->setFlash('yourVariable', 'Error during cleanup: ' . $e->getMessage());
+            Craft::error("Error queueing Algolia cleanup: " . $e->getMessage(), __METHOD__);
+            Craft::$app->getSession()->setError('Error queueing cleanup: ' . $e->getMessage());
         }
 
         return $this->redirectToPostedUrl();

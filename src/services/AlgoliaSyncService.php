@@ -1454,6 +1454,14 @@ class AlgoliaSyncService extends Component
      *
      * @return array ['totalChecked' => int, 'totalStale' => int, 'results' => array]
      */
+    /**
+     * Queue cleanup jobs to check Algolia records and remove stale ones
+     *
+     * This method queues a coordinator job that will browse all configured Algolia
+     * indexes and create batch jobs to process records in manageable chunks.
+     *
+     * @return array Status information about the queued job
+     */
     public function cleanupStaleRecords(): array
     {
         $settings = AlgoliaSync::$plugin->getSettings();
@@ -1464,241 +1472,24 @@ class AlgoliaSyncService extends Component
             throw new \Exception('Algolia API credentials not configured');
         }
 
-        $client = \Algolia\AlgoliaSearch\Api\SearchClient::create($algoliaAppId, $algoliaApiKey);
+        // Queue the coordinator job
+        Craft::$app->getQueue()->push(new \brilliance\algoliasync\jobs\AlgoliaCleanupCoordinatorJob([
+            'batchSize' => 100, // Process 100 records per batch job
+        ]));
 
-        // Get all configured element types and their indexes
-        $elementsToCheck = $this->getConfiguredElementsForCleanup();
-
-        if (empty($elementsToCheck)) {
-            return ['totalChecked' => 0, 'totalStale' => 0, 'results' => []];
-        }
-
-        $totalChecked = 0;
-        $totalStale = 0;
-        $results = [];
-
-        foreach ($elementsToCheck as $elementConfig) {
-            try {
-                $result = $this->checkIndexForStaleRecords(
-                    $client,
-                    $elementConfig['index'],
-                    $elementConfig['type'],
-                    $elementConfig['sectionId']
-                );
-
-                $totalChecked += $result['checked'];
-                $totalStale += $result['stale'];
-
-                $results[] = [
-                    'type' => $elementConfig['type'],
-                    'label' => $elementConfig['label'],
-                    'index' => $elementConfig['index'],
-                    'checked' => $result['checked'],
-                    'stale' => $result['stale'],
-                    'error' => null,
-                ];
-            } catch (\Throwable $e) {
-                // Index doesn't exist or other error - log and continue
-                Craft::warning("Skipping index {$elementConfig['index']}: " . $e->getMessage(), __METHOD__);
-
-                $errorMessage = $e->getMessage();
-                // Make "does not exist" errors clearer by adding "in Algolia"
-                if (strpos($errorMessage, 'does not exist') !== false) {
-                    $errorMessage = str_replace('does not exist', 'does not exist in Algolia', $errorMessage);
-                }
-
-                $results[] = [
-                    'type' => $elementConfig['type'],
-                    'label' => $elementConfig['label'],
-                    'index' => $elementConfig['index'],
-                    'checked' => 0,
-                    'stale' => 0,
-                    'error' => $errorMessage,
-                ];
-            }
-        }
-
+        // Return immediately - processing will happen in the queue
         return [
-            'totalChecked' => $totalChecked,
-            'totalStale' => $totalStale,
-            'results' => $results,
+            'queued' => true,
+            'message' => 'Cleanup coordinator job has been queued. The job will browse all configured Algolia indexes and queue batch jobs to check records. Monitor the queue for progress.'
         ];
-    }
-
-    /**
-     * Check a single Algolia index for stale records
-     *
-     * @param \Algolia\AlgoliaSearch\Api\SearchClient $client
-     * @param string $indexName
-     * @param string $elementType
-     * @param int $sectionId
-     * @return array ['checked' => int, 'stale' => int]
-     */
-    protected function checkIndexForStaleRecords($client, string $indexName, string $elementType, int $sectionId): array
-    {
-        $checked = 0;
-        $stale = 0;
-        $batch = [];
-        $batchSize = 100;
-
-        // Browse all records in the index
-        $browseParams = ['attributesToRetrieve' => ['objectID']];
-
-        foreach ($client->browseObjects($indexName, $browseParams) as $hit) {
-            if (!isset($hit['objectID'])) {
-                continue;
-            }
-
-            $checked++;
-            $objectID = $hit['objectID'];
-
-            // Parse objectID to get element ID and site ID
-            $parts = explode('-', $objectID);
-            $elementId = (int)$parts[0];
-            $siteId = isset($parts[1]) ? (int)$parts[1] : null;
-
-            $batch[] = [
-                'objectID' => $objectID,
-                'elementId' => $elementId,
-                'siteId' => $siteId,
-            ];
-
-            // Process batch when it reaches the size limit
-            if (count($batch) >= $batchSize) {
-                $stale += $this->processBatchForCleanup($batch, $elementType, $sectionId, $indexName);
-                $batch = [];
-            }
-        }
-
-        // Process remaining batch
-        if (!empty($batch)) {
-            $stale += $this->processBatchForCleanup($batch, $elementType, $sectionId, $indexName);
-        }
-
-        return ['checked' => $checked, 'stale' => $stale];
-    }
-
-    /**
-     * Process a batch of Algolia records and queue deletions for stale ones
-     *
-     * @param array $batch
-     * @param string $elementType
-     * @param int $sectionId
-     * @param string $indexName
-     * @return int Number of stale records found
-     */
-    protected function processBatchForCleanup(array $batch, string $elementType, int $sectionId, string $indexName): int
-    {
-        $elementIds = array_column($batch, 'elementId');
-        $staleCount = 0;
-
-        // Query Craft for these elements (all statuses)
-        $elements = $this->queryElementsForCleanup($elementType, $sectionId, $elementIds);
-
-        // Check each record in the batch
-        foreach ($batch as $record) {
-            $elementId = $record['elementId'];
-            $objectID = $record['objectID'];
-            $element = $elements[$elementId] ?? null;
-
-            $shouldDelete = false;
-            $reason = '';
-
-            if (!$element) {
-                $shouldDelete = true;
-                $reason = 'deleted';
-            } elseif (!$element->enabled) {
-                $shouldDelete = true;
-                $reason = 'disabled';
-            } elseif (isset($element->expiryDate) && $element->expiryDate instanceof \DateTime) {
-                $now = new \DateTime();
-                if ($element->expiryDate < $now) {
-                    $shouldDelete = true;
-                    $reason = 'expired';
-                }
-            }
-
-            if ($shouldDelete) {
-                $queue = Craft::$app->getQueue();
-                $queue->push(new \brilliance\algoliasync\jobs\AlgoliaSyncTask([
-                    'algoliaIndex' => [$indexName],
-                    'algoliaFunction' => 'delete',
-                    'algoliaObjectID' => $objectID,
-                    'algoliaRecord' => [],
-                    'queueMessage' => "Cleanup: Deleting stale record {$objectID} (reason: {$reason})"
-                ]));
-                $staleCount++;
-            }
-        }
-
-        return $staleCount;
-    }
-
-    /**
-     * Query Craft elements by type and IDs for cleanup
-     *
-     * @param string $elementType
-     * @param int $sectionId
-     * @param array $elementIds
-     * @return array Indexed by element ID
-     */
-    protected function queryElementsForCleanup(string $elementType, int $sectionId, array $elementIds): array
-    {
-        $query = null;
-
-        switch ($elementType) {
-            case 'entry':
-                $query = Entry::find()
-                    ->id($elementIds)
-                    ->sectionId($sectionId)
-                    ->status(null)
-                    ->indexBy('id');
-                break;
-
-            case 'category':
-                $query = Category::find()
-                    ->id($elementIds)
-                    ->groupId($sectionId)
-                    ->status(null)
-                    ->indexBy('id');
-                break;
-
-            case 'asset':
-                $query = Asset::find()
-                    ->id($elementIds)
-                    ->volume($sectionId)
-                    ->status(null)
-                    ->indexBy('id');
-                break;
-
-            case 'user':
-                $query = User::find()
-                    ->id($elementIds)
-                    ->groupId($sectionId)
-                    ->status(null)
-                    ->indexBy('id');
-                break;
-
-            case 'product':
-                if (class_exists('craft\commerce\elements\Product')) {
-                    $query = \craft\commerce\elements\Product::find()
-                        ->id($elementIds)
-                        ->typeId($sectionId)
-                        ->status(null)
-                        ->indexBy('id');
-                }
-                break;
-        }
-
-        return $query ? $query->all() : [];
     }
 
     /**
      * Get all configured elements that should be checked for cleanup
      *
-     * @return array
+     * @return array Array of element configs with 'type', 'sectionId', 'index', 'label'
      */
-    protected function getConfiguredElementsForCleanup(): array
+    public function getConfiguredElementsForCleanup(): array
     {
         $settings = AlgoliaSync::$plugin->getSettings();
         $elements = [];

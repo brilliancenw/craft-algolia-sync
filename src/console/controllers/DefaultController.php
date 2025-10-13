@@ -28,46 +28,35 @@ use Throwable;
 class DefaultController extends Controller
 {
     /**
-     * Checks all records in configured Algolia indexes and removes stale ones.
+     * Queues cleanup jobs to check Algolia records and remove stale ones.
      * Removes records that are deleted, disabled, or expired in Craft.
-     * Uses efficient batching to avoid overwhelming the queue.
+     * Uses efficient batching with one job per index, then batch jobs for processing.
      *
      * Usage: ./craft algolia-sync/default/cleanup-stale-records
      */
     public function actionCleanupStaleRecords(): int
     {
-        $this->stdout("Starting Algolia stale record cleanup...\n", Console::FG_YELLOW);
+        $this->stdout("Queueing Algolia stale record cleanup jobs...\n", Console::FG_YELLOW);
 
         try {
             $result = AlgoliaSync::$plugin->algoliaSyncService->cleanupStaleRecords();
 
-            $this->stdout("\n" . str_repeat('=', 60) . "\n", Console::FG_GREEN);
-            $this->stdout("Cleanup complete!\n", Console::FG_GREEN);
-            $this->stdout("Total records checked: {$result['totalChecked']}\n");
-            $this->stdout("Total stale records queued for deletion: {$result['totalStale']}\n");
+            if ($result['queued']) {
+                $this->stdout("\n" . str_repeat('=', 60) . "\n", Console::FG_GREEN);
+                $this->stdout("Cleanup jobs queued successfully!\n", Console::FG_GREEN);
+                $this->stdout(str_repeat('=', 60) . "\n\n", Console::FG_GREEN);
 
-            if (!empty($result['results'])) {
-                $this->stdout("\nDetails by index:\n", Console::FG_CYAN);
-                foreach ($result['results'] as $indexResult) {
-                    if (isset($indexResult['error']) && $indexResult['error']) {
-                        $this->stdout("  {$indexResult['label']}: ", Console::FG_CYAN);
-                        $this->stdout("SKIPPED - {$indexResult['error']}\n", Console::FG_GREY);
-                    } else {
-                        $staleColor = $indexResult['stale'] > 0 ? Console::FG_YELLOW : Console::FG_GREEN;
-                        $this->stdout("  {$indexResult['label']}: ", Console::FG_CYAN);
-                        $this->stdout("{$indexResult['checked']} checked, ");
-                        $this->stdout("{$indexResult['stale']} stale\n", $staleColor);
-                    }
-                }
+                $this->stdout($result['message'] . "\n\n");
+                $this->stdout("Monitor queue progress:\n", Console::FG_CYAN);
+                $this->stdout("  php craft queue/info\n");
+                $this->stdout("  php craft queue/run\n\n");
             }
-
-            $this->stdout(str_repeat('=', 60) . "\n", Console::FG_GREEN);
 
             return 0;
 
         } catch (Throwable $e) {
-            $this->stderr("Error during cleanup: " . $e->getMessage() . "\n", Console::FG_RED);
-            Craft::error("Error during Algolia cleanup: " . $e->getMessage() . "\n" . $e->getTraceAsString(), __METHOD__);
+            $this->stderr("Error queueing cleanup: " . $e->getMessage() . "\n", Console::FG_RED);
+            Craft::error("Error queueing Algolia cleanup: " . $e->getMessage() . "\n" . $e->getTraceAsString(), __METHOD__);
             return 1;
         }
     }
