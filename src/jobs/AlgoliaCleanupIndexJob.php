@@ -57,7 +57,8 @@ class AlgoliaCleanupIndexJob extends BaseJob
         $client = \Algolia\AlgoliaSearch\Api\SearchClient::create($algoliaAppId, $algoliaApiKey);
 
         $batch = [];
-        $browseParams = ['attributesToRetrieve' => ['objectID']];
+        // Retrieve objectID AND section info to know which section to check in Craft
+        $browseParams = ['attributesToRetrieve' => ['objectID', 'sectionId', 'type']];
         $totalProcessed = 0;
 
         try {
@@ -66,7 +67,12 @@ class AlgoliaCleanupIndexJob extends BaseJob
                     continue;
                 }
 
-                $batch[] = $hit['objectID'];
+                // Store the full record data (objectID + metadata)
+                $batch[] = [
+                    'objectID' => $hit['objectID'],
+                    'sectionId' => $hit['sectionId'] ?? null,
+                    'type' => $hit['type'] ?? null,
+                ];
                 $totalProcessed++;
 
                 // Queue a batch job when we reach the batch size

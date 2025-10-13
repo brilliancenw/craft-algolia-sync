@@ -21,10 +21,10 @@ use craft\elements\User;
 class AlgoliaCleanupBatchJob extends BaseJob
 {
     /**
-     * Array of Algolia objectIDs to check
+     * Array of Algolia records to check (each contains objectID, sectionId, type)
      * @var array
      */
-    public array $objectIDs = [];
+    public array $objectIDs = []; // Actually contains full record data, not just IDs
 
     /**
      * The Algolia index name
@@ -59,37 +59,56 @@ class AlgoliaCleanupBatchJob extends BaseJob
         $total = count($this->objectIDs);
         $processed = 0;
 
-        // Parse objectIDs to get element IDs and site IDs
-        // Map: "elementId-siteId" => [objectIDs]
-        $elementSiteMap = [];
+        // Parse records to get element IDs, site IDs, and section info from Algolia
+        // Map: "elementId-siteId-sectionId" => [records]
+        $elementMap = [];
 
-        foreach ($this->objectIDs as $objectID) {
+        foreach ($this->objectIDs as $record) {
+            // Handle both old format (string objectID) and new format (array with metadata)
+            if (is_string($record)) {
+                $objectID = $record;
+                $algoliaType = null;
+                $algoliaSectionId = null;
+            } else {
+                $objectID = $record['objectID'];
+                $algoliaType = $record['type'] ?? null;
+                $algoliaSectionId = $record['sectionId'] ?? null;
+            }
+
             // Parse objectID to get element ID and site ID (e.g., "123" or "123-1")
             $parts = explode('-', $objectID);
             $elementId = (int)$parts[0];
             $siteId = isset($parts[1]) ? (int)$parts[1] : null;
 
-            // Create a key combining elementId and siteId
-            $key = $siteId ? "{$elementId}-{$siteId}" : (string)$elementId;
+            // Use section ID from Algolia record if available, otherwise use job's sectionId
+            $sectionId = $algoliaSectionId ?? $this->sectionId;
+            $elementType = $algoliaType ?? $this->elementType;
 
-            if (!isset($elementSiteMap[$key])) {
-                $elementSiteMap[$key] = [
+            // Create a unique key
+            $key = "{$elementId}-" . ($siteId ?? 'default') . "-{$sectionId}";
+
+            if (!isset($elementMap[$key])) {
+                $elementMap[$key] = [
                     'elementId' => $elementId,
                     'siteId' => $siteId,
+                    'sectionId' => $sectionId,
+                    'elementType' => $elementType,
                     'objectIDs' => []
                 ];
             }
-            $elementSiteMap[$key]['objectIDs'][] = $objectID;
+            $elementMap[$key]['objectIDs'][] = $objectID;
         }
 
         // Check each element in its specific site context
-        foreach ($elementSiteMap as $key => $data) {
+        foreach ($elementMap as $key => $data) {
             $elementId = $data['elementId'];
             $siteId = $data['siteId'];
+            $sectionId = $data['sectionId'];
+            $elementType = $data['elementType'];
             $objectIDs = $data['objectIDs'];
 
-            // Query element for this specific site
-            $element = $this->queryElement($elementId, $siteId);
+            // Query element for this specific site and section
+            $element = $this->queryElement($elementId, $siteId, $sectionId, $elementType);
 
             foreach ($objectIDs as $objectID) {
                 $processed++;
@@ -114,13 +133,15 @@ class AlgoliaCleanupBatchJob extends BaseJob
     }
 
     /**
-     * Query a single Craft element by ID for a specific site
+     * Query a single Craft element by ID for a specific site and section
      *
      * @param int $elementId
      * @param int|null $siteId Site ID, or null for default site
+     * @param int $sectionId Section/group/volume/type ID
+     * @param string $elementType Element type (entry, category, asset, user, product)
      * @return \craft\base\ElementInterface|null
      */
-    protected function queryElement(int $elementId, ?int $siteId)
+    protected function queryElement(int $elementId, ?int $siteId, int $sectionId, string $elementType)
     {
         // If no siteId specified, use the primary site
         if ($siteId === null) {
@@ -129,11 +150,11 @@ class AlgoliaCleanupBatchJob extends BaseJob
 
         $query = null;
 
-        switch ($this->elementType) {
+        switch ($elementType) {
             case 'entry':
                 $query = Entry::find()
                     ->id($elementId)
-                    ->sectionId($this->sectionId)
+                    ->sectionId($sectionId)
                     ->siteId($siteId)
                     ->status(null); // Include all statuses
                 break;
@@ -141,7 +162,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
             case 'category':
                 $query = Category::find()
                     ->id($elementId)
-                    ->groupId($this->sectionId)
+                    ->groupId($sectionId)
                     ->siteId($siteId)
                     ->status(null);
                 break;
@@ -149,7 +170,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
             case 'asset':
                 $query = Asset::find()
                     ->id($elementId)
-                    ->volumeId($this->sectionId)
+                    ->volumeId($sectionId)
                     ->siteId($siteId)
                     ->status(null);
                 break;
@@ -158,7 +179,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
                 // Users don't have site-specific versions
                 $query = User::find()
                     ->id($elementId)
-                    ->groupId($this->sectionId)
+                    ->groupId($sectionId)
                     ->status(null);
                 break;
 
@@ -166,7 +187,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
                 if (class_exists('craft\\commerce\\elements\\Product')) {
                     $query = \craft\commerce\elements\Product::find()
                         ->id($elementId)
-                        ->typeId($this->sectionId)
+                        ->typeId($sectionId)
                         ->siteId($siteId)
                         ->status(null);
                 }
