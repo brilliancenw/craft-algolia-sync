@@ -57,8 +57,9 @@ class AlgoliaCleanupIndexJob extends BaseJob
         $client = \Algolia\AlgoliaSearch\Api\SearchClient::create($algoliaAppId, $algoliaApiKey);
 
         $batch = [];
-        // Retrieve objectID AND section info to know which section to check in Craft
-        $browseParams = ['attributesToRetrieve' => ['objectID', 'sectionId', 'type']];
+        // Retrieve objectID AND type to know which section to check in Craft
+        // Note: 'type' in Algolia is the section handle (e.g., "blog", "recipe")
+        $browseParams = ['attributesToRetrieve' => ['objectID', 'type', 'slug']];
         $totalProcessed = 0;
 
         try {
@@ -68,10 +69,11 @@ class AlgoliaCleanupIndexJob extends BaseJob
                 }
 
                 // Store the full record data (objectID + metadata)
+                // The 'type' field contains the section handle (e.g., "blog", "recipe")
                 $batch[] = [
                     'objectID' => $hit['objectID'],
-                    'sectionId' => $hit['sectionId'] ?? null,
                     'type' => $hit['type'] ?? null,
+                    'slug' => $hit['slug'] ?? null,
                 ];
                 $totalProcessed++;
 

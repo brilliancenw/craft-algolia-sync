@@ -68,11 +68,10 @@ class AlgoliaCleanupBatchJob extends BaseJob
             if (is_string($record)) {
                 $objectID = $record;
                 $algoliaType = null;
-                $algoliaSectionId = null;
             } else {
                 $objectID = $record['objectID'];
+                // Type is the section handle like "blog", "recipe", etc.
                 $algoliaType = $record['type'] ?? null;
-                $algoliaSectionId = $record['sectionId'] ?? null;
             }
 
             // Parse objectID to get element ID and site ID (e.g., "123" or "123-1")
@@ -80,9 +79,17 @@ class AlgoliaCleanupBatchJob extends BaseJob
             $elementId = (int)$parts[0];
             $siteId = isset($parts[1]) ? (int)$parts[1] : null;
 
-            // Use section ID from Algolia record if available, otherwise use job's sectionId
-            $sectionId = $algoliaSectionId ?? $this->sectionId;
-            $elementType = $algoliaType ?? $this->elementType;
+            // Look up section info based on type from Algolia
+            $sectionInfo = $this->getSectionInfoFromType($algoliaType);
+
+            if (!$sectionInfo) {
+                // Can't determine section, skip this record
+                Craft::warning("Could not determine section for objectID {$objectID} with type '{$algoliaType}'", 'algolia-sync');
+                continue;
+            }
+
+            $sectionId = $sectionInfo['sectionId'];
+            $elementType = $sectionInfo['elementType'];
 
             // Create a unique key
             $key = "{$elementId}-" . ($siteId ?? 'default') . "-{$sectionId}";
@@ -130,6 +137,69 @@ class AlgoliaCleanupBatchJob extends BaseJob
                 // If enabled and not expired, nothing to do - record is valid
             }
         }
+    }
+
+    /**
+     * Get section info based on type from Algolia record
+     * The type field contains the section handle (e.g., "blog", "recipe", "product")
+     *
+     * @param string|null $type Section handle from Algolia
+     * @return array|null ['sectionId' => int, 'elementType' => string] or null if not found
+     */
+    protected function getSectionInfoFromType(?string $type): ?array
+    {
+        if (!$type) {
+            return null;
+        }
+
+        // For entries, look up by section handle
+        $section = Craft::$app->getSections()->getSectionByHandle($type);
+        if ($section) {
+            return [
+                'sectionId' => $section->id,
+                'elementType' => 'entry'
+            ];
+        }
+
+        // For categories, look up by group handle
+        $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($type);
+        if ($categoryGroup) {
+            return [
+                'sectionId' => $categoryGroup->id,
+                'elementType' => 'category'
+            ];
+        }
+
+        // For assets, look up by volume handle
+        $volume = Craft::$app->getVolumes()->getVolumeByHandle($type);
+        if ($volume) {
+            return [
+                'sectionId' => $volume->id,
+                'elementType' => 'asset'
+            ];
+        }
+
+        // For products, look up by product type handle
+        if (Craft::$app->getPlugins()->isPluginEnabled('commerce')) {
+            $productType = \craft\commerce\Plugin::getInstance()->getProductTypes()->getProductTypeByHandle($type);
+            if ($productType) {
+                return [
+                    'sectionId' => $productType->id,
+                    'elementType' => 'product'
+                ];
+            }
+        }
+
+        // For users, look up by user group handle
+        $userGroup = Craft::$app->getUserGroups()->getGroupByHandle($type);
+        if ($userGroup) {
+            return [
+                'sectionId' => $userGroup->id,
+                'elementType' => 'user'
+            ];
+        }
+
+        return null;
     }
 
     /**
