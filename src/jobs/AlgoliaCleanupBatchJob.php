@@ -153,7 +153,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
         }
 
         // For entries, look up by section handle
-        $section = Craft::$app->getSections()->getSectionByHandle($type);
+        $section = Craft::$app->sections->getSectionByHandle($type);
         if ($section) {
             return [
                 'sectionId' => $section->id,
@@ -162,7 +162,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
         }
 
         // For categories, look up by group handle
-        $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($type);
+        $categoryGroup = Craft::$app->categories->getGroupByHandle($type);
         if ($categoryGroup) {
             return [
                 'sectionId' => $categoryGroup->id,
@@ -171,7 +171,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
         }
 
         // For assets, look up by volume handle
-        $volume = Craft::$app->getVolumes()->getVolumeByHandle($type);
+        $volume = Craft::$app->volumes->getVolumeByHandle($type);
         if ($volume) {
             return [
                 'sectionId' => $volume->id,
@@ -180,7 +180,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
         }
 
         // For products, look up by product type handle
-        if (Craft::$app->getPlugins()->isPluginEnabled('commerce')) {
+        if (Craft::$app->plugins->isPluginEnabled('commerce')) {
             $productType = \craft\commerce\Plugin::getInstance()->getProductTypes()->getProductTypeByHandle($type);
             if ($productType) {
                 return [
@@ -191,7 +191,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
         }
 
         // For users, look up by user group handle
-        $userGroup = Craft::$app->getUserGroups()->getGroupByHandle($type);
+        $userGroup = Craft::$app->userGroups->getGroupByHandle($type);
         if ($userGroup) {
             return [
                 'sectionId' => $userGroup->id,
