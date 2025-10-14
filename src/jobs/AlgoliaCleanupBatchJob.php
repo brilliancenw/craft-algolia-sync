@@ -153,7 +153,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
         }
 
         // For entries, look up by section handle
-        $section = Craft::$app->sections->getSectionByHandle($type);
+        $section = Craft::$app->entries->getSectionByHandle($type);
         if ($section) {
             return [
                 'sectionId' => $section->id,
