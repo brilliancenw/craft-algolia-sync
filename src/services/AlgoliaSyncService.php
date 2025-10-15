@@ -171,13 +171,33 @@ class AlgoliaSyncService extends Component
             $algoliaIndex = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
             $objectID = $this->generateObjectID($element);
 
+            // Generate meaningful queue message matching the format used elsewhere
+            $title = $element->title ?? ($element->username ?? 'N/A');
+            $max = 40;
+            $short = mb_strlen($title) > $max ? mb_substr($title, 0, $max) . '...' : $title;
+            $type = strtolower(basename(str_replace('\\', '/', get_class($element))));
+            $site = Craft::$app->getSites()->getSiteById($element->siteId);
+            $siteHandle = $site ? $site->handle : 'unknown';
+            $siteId = $element->siteId;
+            $algoliaIndexHandle = is_array($algoliaIndex) ? $algoliaIndex[0] : $algoliaIndex;
+
+            $queueMessage = sprintf(
+                'Algolia Sync: Deleting %s "%s (id: %s)", Site: "%s (id: %d)", Index "%s"',
+                $type,
+                $short,
+                $objectID,
+                $siteHandle,
+                $siteId,
+                $algoliaIndexHandle
+            );
+
             $queue = Craft::$app->getQueue();
             $queue->push(new AlgoliaSyncTask([
                 'algoliaIndex' => $algoliaIndex,
                 'algoliaFunction' => 'delete',
                 'algoliaObjectID' => $objectID,
                 'algoliaRecord' => [],
-                'queueMessage' => "Item is not enabled, confirming it's removed from Algolia"
+                'queueMessage' => $queueMessage
             ]));
 
             return false;
