@@ -177,7 +177,7 @@ class AlgoliaSyncService extends Component
                 'algoliaFunction' => 'delete',
                 'algoliaObjectID' => $objectID,
                 'algoliaRecord' => [],
-                'algoliaMessage' => "Item is not enabled, confirming it's removed from Algolia"
+                'queueMessage' => "Item is not enabled, confirming it's removed from Algolia"
             ]));
 
             return false;
