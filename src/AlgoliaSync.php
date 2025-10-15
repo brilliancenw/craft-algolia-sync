@@ -217,7 +217,30 @@ class AlgoliaSync extends Plugin
 
                 // the User record is only recorded when it's related to a user group
                 // this is covered in the Users::EVENT_AFTER_ASSIGN_USER_TO_GROUPS event
-                if ($event->element instanceof craft\elements\User || ElementHelper::isDraftOrRevision($event->element)) {
+                if ($event->element instanceof \craft\elements\User) {
+                    return $event;
+                }
+
+                // Diagnostic logging to understand draft/revision behavior
+                $isDraft = ElementHelper::isDraft($event->element);
+                $isRevision = ElementHelper::isRevision($event->element);
+                $canonicalId = $event->element->getCanonicalId();
+                $elementId = $event->element->id;
+                $isCanonical = ($canonicalId === $elementId || $canonicalId === null);
+
+                AlgoliaSync::$plugin->algoliaSyncService->logger(
+                    "EVENT_AFTER_SAVE_ELEMENT - ID: {$elementId}, Canonical: {$canonicalId}, isDraft: " . ($isDraft ? 'true' : 'false') . ", isRevision: " . ($isRevision ? 'true' : 'false') . ", isCanonical: " . ($isCanonical ? 'true' : 'false'),
+                    basename(__FILE__),
+                    __LINE__
+                );
+
+                // Skip drafts and revisions - only sync canonical elements
+                if (ElementHelper::isDraftOrRevision($event->element)) {
+                    AlgoliaSync::$plugin->algoliaSyncService->logger(
+                        "Skipping draft/revision sync for element ID {$elementId} (canonical ID: {$canonicalId})",
+                        basename(__FILE__),
+                        __LINE__
+                    );
                     return $event;
                 }
 

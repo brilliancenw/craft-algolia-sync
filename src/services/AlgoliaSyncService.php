@@ -161,7 +161,10 @@ class AlgoliaSyncService extends Component
 
         AlgoliaSync::$plugin->algoliaSyncService->logger("trying to sync a ".$className, basename(__FILE__) , __LINE__);
 
-        if (isset($elementInfo['enabled']) && empty($elementInfo['enabled'])) {
+        // Check actual enabled status from database (more reliable than $element->enabled)
+        // Note: This early check may be redundant now that prepareAlgoliaSyncElement() does its own check,
+        // but we keep it for backward compatibility with any direct calls to this method
+        if (!$this->isElementActuallyEnabled($element)) {
             AlgoliaSync::$plugin->algoliaSyncService->logger("This item is not enabled", basename(__FILE__) , __LINE__);
 
             // at this point, we should remove the product from the index - we don't know if it was already there...
@@ -851,6 +854,10 @@ class AlgoliaSyncService extends Component
         }
 
         // Determine Algolia action
+        // Check element's actual enabled status from the database
+        // When bulk disabling from index page, $element->enabled may not reflect the current state
+        $isEnabled = $this->isElementActuallyEnabled($element);
+
         // Check if element is expired
         $isExpired = false;
         if (isset($element->expiryDate) && $element->expiryDate instanceof \DateTime) {
@@ -858,7 +865,7 @@ class AlgoliaSyncService extends Component
             $isExpired = ($element->expiryDate < $now);
         }
 
-        $isDelete = ($action === 'delete' || !$element->enabled || $isExpired);
+        $isDelete = ($action === 'delete' || !$isEnabled || $isExpired);
         $algoliaAction = $isDelete ? 'delete' : 'insert';
         $algoliaActionTitle = $isDelete ? 'Deleting' : 'Inserting';
         $algoliaIndexHandle = $this->getAlgoliaIndex($element)[0];
@@ -1162,6 +1169,37 @@ class AlgoliaSyncService extends Component
         } else {
             return "{$element->id}-{$siteId}";
         }
+    }
+
+    /**
+     * Check if an element is actually enabled by querying the database
+     * This is more reliable than checking $element->enabled which may be stale
+     * when bulk actions are performed from the element index page
+     *
+     * @param Element $element The element to check
+     * @return bool True if the element is enabled (globally and for its site)
+     */
+    protected function isElementActuallyEnabled($element): bool
+    {
+        // Check global enabled status in elements table
+        $globalEnabled = (new Query())
+            ->select(['enabled'])
+            ->from(['{{%elements}}'])
+            ->where(['id' => $element->id])
+            ->scalar();
+
+        if (!$globalEnabled) {
+            return false;
+        }
+
+        // Check site-specific enabled status
+        $siteEnabled = (new Query())
+            ->select(['enabled'])
+            ->from(['{{%elements_sites}}'])
+            ->where(['elementId' => $element->id, 'siteId' => $element->siteId])
+            ->scalar();
+
+        return (bool)$siteEnabled;
     }
 
     public function sanitizeFieldName($fieldName) {
