@@ -181,6 +181,18 @@ class AlgoliaSync extends Plugin
                     $recursionLevel++;
                     $recursiveRecord[] = $thisEventId;
 
+                    // Skip drafts and revisions - they were never indexed in Algolia
+                    // Only delete canonical elements from Algolia
+                    if (ElementHelper::isDraftOrRevision($event->element)) {
+                        $canonicalId = $event->element->getCanonicalId();
+                        AlgoliaSync::$plugin->algoliaSyncService->logger(
+                            "Skipping draft/revision deletion for element ID {$thisEventId} (canonical ID: {$canonicalId})",
+                            basename(__FILE__),
+                            __LINE__
+                        );
+                        return $event;
+                    }
+
                     AlgoliaSync::$plugin->algoliaSyncService->prepareAlgoliaSyncElement($event->element, 'delete');
                 }
 
