@@ -77,7 +77,6 @@ class DefaultController extends Controller
             return $this->redirectToPostedUrl();
         }
 
-        $queue = Craft::$app->getQueue();
         $queuedCount = 0;
 
         foreach ($loadRecordTypes as $loadRecordType) {
@@ -88,7 +87,7 @@ class DefaultController extends Controller
 
             $messageString = 'Queueing Up Bulk Records to sync into Algolia (Type: ' . $loadRecordArray[0] . ', ID: ' . $loadRecordArray[1] . ')';
 
-            $queue->push(new AlgoliaBulkLoadTask([
+            AlgoliaSync::$plugin->pushToQueue(new AlgoliaBulkLoadTask([
                 'description' => Craft::t('algolia-sync', $messageString),
                 'loadRecordType' => $loadRecordArray,
             ]));

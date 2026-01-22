@@ -119,7 +119,7 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 ]
             );
 
-            $queue->push(new AlgoliaChunkLoadTask([
+            AlgoliaSync::$plugin->pushToQueue(new AlgoliaChunkLoadTask([
                 'description'    => $desc,
                 'loadRecordType' => $this->loadRecordType,
                 'limit'          => $this->standardLimit,

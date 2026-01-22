@@ -33,7 +33,7 @@ class AlgoliaCleanupCoordinatorJob extends BaseJob
 
         // Queue one job per index
         foreach ($elementsToCheck as $elementConfig) {
-            Craft::$app->getQueue()->push(new AlgoliaCleanupIndexJob([
+            AlgoliaSync::$plugin->pushToQueue(new AlgoliaCleanupIndexJob([
                 'indexName' => $elementConfig['index'],
                 'elementType' => $elementConfig['type'],
                 'sectionId' => $elementConfig['sectionId'],
