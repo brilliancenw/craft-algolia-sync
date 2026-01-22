@@ -102,7 +102,7 @@ class AlgoliaCleanupIndexJob extends BaseJob
      */
     protected function queueBatchJob(array $objectIDs): void
     {
-        Craft::$app->getQueue()->push(new AlgoliaCleanupBatchJob([
+        AlgoliaSync::$plugin->pushToQueue(new AlgoliaCleanupBatchJob([
             'objectIDs' => $objectIDs,
             'indexName' => $this->indexName,
             'elementType' => $this->elementType,

@@ -79,11 +79,27 @@ class AlgoliaSync extends Plugin
     // =========================================================================
 
     /**
-     * To execute your plugin’s migrations, you’ll need to increase its schema version.
+     * To execute your plugin's migrations, you'll need to increase its schema version.
      *
      * @var string
      */
     public string $schemaVersion = '1.0.1';
+
+    // Public Methods
+    // =========================================================================
+
+    /**
+     * Push a job to the queue with the configured priority
+     *
+     * @param \craft\queue\BaseJob $job The job to push
+     * @return string|null The job ID
+     */
+    public function pushToQueue($job): ?string
+    {
+        $settings = $this->getSettings();
+        $priority = $settings->queuePriority ?? 50;
+        return Craft::$app->getQueue()->priority($priority)->push($job);
+    }
 
 
     // Public Methods

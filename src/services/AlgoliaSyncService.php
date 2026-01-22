@@ -191,8 +191,7 @@ class AlgoliaSyncService extends Component
                 $algoliaIndexHandle
             );
 
-            $queue = Craft::$app->getQueue();
-            $queue->push(new AlgoliaSyncTask([
+            AlgoliaSync::$plugin->pushToQueue(new AlgoliaSyncTask([
                 'algoliaIndex' => $algoliaIndex,
                 'algoliaFunction' => 'delete',
                 'algoliaObjectID' => $objectID,
@@ -264,8 +263,7 @@ class AlgoliaSyncService extends Component
             $message .= print_r($recordUpdate['index'], true);
             $message .= print_r($recordUpdate, true);
 
-            $queue = Craft::$app->getQueue();
-            $queue->push(new AlgoliaSyncTask([
+            AlgoliaSync::$plugin->pushToQueue(new AlgoliaSyncTask([
                 'algoliaIndex' => $recordUpdate['index'],
                 'algoliaFunction' => $action,
                 'algoliaObjectID' => $recordUpdate['attributes']['objectID'],
@@ -1531,7 +1529,7 @@ class AlgoliaSyncService extends Component
         }
 
         // Queue the coordinator job
-        Craft::$app->getQueue()->push(new \brilliance\algoliasync\jobs\AlgoliaCleanupCoordinatorJob([
+        AlgoliaSync::$plugin->pushToQueue(new \brilliance\algoliasync\jobs\AlgoliaCleanupCoordinatorJob([
             'batchSize' => 100, // Process 100 records per batch job
         ]));
 

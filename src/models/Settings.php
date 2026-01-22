@@ -45,6 +45,7 @@ class Settings extends Model
     public string $algoliaSearch = ''; // ALGOLIA_SEARCH
     public array $algoliaElements = []; // sections, categories, usergroups, etc...
     public bool $appendSiteIdToDefaultSite = false; // append site ID to default site objectIDs
+    public int $queuePriority = 50; // Queue job priority (lower = higher priority, default Craft is 1024)
 
     public function getAlgoliaAdmin(): string
     {

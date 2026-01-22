@@ -272,7 +272,7 @@ class AlgoliaCleanupBatchJob extends BaseJob
      */
     protected function queueDeletion(string $objectID, string $reason): void
     {
-        Craft::$app->getQueue()->push(new AlgoliaSyncTask([
+        AlgoliaSync::$plugin->pushToQueue(new AlgoliaSyncTask([
             'algoliaIndex' => [$this->indexName],
             'algoliaFunction' => 'delete',
             'algoliaObjectID' => $objectID,

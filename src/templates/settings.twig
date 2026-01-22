@@ -86,6 +86,21 @@
 <a href="{{ cpUrl('utilities/algolia-sync-utility') }}" class="go">Visit the Utilities Page to Cleanup Stale Records</a>
 
 <hr>
+<h1>Queue Settings</h1>
+
+{{ forms.textField({
+    label: 'Queue Job Priority',
+    instructions: 'Priority for Algolia sync queue jobs. Lower numbers = higher priority. Default Craft priority is 1024. Set this lower than other plugins (like Blitz at 100) to process Algolia syncs first.',
+    id: 'queuePriority',
+    name: 'queuePriority',
+    value: settings.queuePriority ?? 50,
+    type: 'number',
+    min: 1,
+    max: 9999,
+    size: 5,
+}) }}
+
+<hr>
 <h1>Algolia API Keys</h1>
 {{ forms.autosuggestField({
     label: 'Algolia Application ID',
