@@ -169,6 +169,13 @@ class AlgoliaSyncService extends Component
 
             // at this point, we should remove the product from the index - we don't know if it was already there...
             $algoliaIndex = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
+
+            // Skip if no index is configured for this element (e.g., nested entries in matrix fields)
+            if (empty($algoliaIndex)) {
+                AlgoliaSync::$plugin->algoliaSyncService->logger("No Algolia index configured for this element, skipping", basename(__FILE__) , __LINE__);
+                return false;
+            }
+
             $objectID = $this->generateObjectID($element);
 
             // Generate meaningful queue message matching the format used elsewhere
@@ -179,7 +186,7 @@ class AlgoliaSyncService extends Component
             $site = Craft::$app->getSites()->getSiteById($element->siteId);
             $siteHandle = $site ? $site->handle : 'unknown';
             $siteId = $element->siteId;
-            $algoliaIndexHandle = is_array($algoliaIndex) ? $algoliaIndex[0] : $algoliaIndex;
+            $algoliaIndexHandle = is_array($algoliaIndex) && !empty($algoliaIndex) ? $algoliaIndex[0] : $algoliaIndex;
 
             $queueMessage = sprintf(
                 'Algolia Sync: Deleting %s "%s (id: %s)", Site: "%s (id: %d)", Index "%s"',
@@ -886,12 +893,19 @@ class AlgoliaSyncService extends Component
         $isDelete = ($action === 'delete' || !$isEnabled || $isExpired);
         $algoliaAction = $isDelete ? 'delete' : 'insert';
         $algoliaActionTitle = $isDelete ? 'Deleting' : 'Inserting';
-        $algoliaIndexHandle = $this->getAlgoliaIndex($element)[0];
+
+        // Get the Algolia index - skip if none configured (e.g., nested entries in matrix fields)
+        $algoliaIndexes = $this->getAlgoliaIndex($element);
+        if (empty($algoliaIndexes)) {
+            $this->logger("No Algolia index configured for element {$element->id}, skipping", __FILE__, __LINE__);
+            return;
+        }
+        $algoliaIndexHandle = $algoliaIndexes[0];
 
         // Build base payload
         $recordTemplate = [
             'attributes' => [],
-            'index' => $this->getAlgoliaIndex($element),
+            'index' => $algoliaIndexes,
             'elementType' => ucwords($type),
             'handle' => $elementInfo['sectionHandle'],
         ];
