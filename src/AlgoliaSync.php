@@ -249,26 +249,8 @@ class AlgoliaSync extends Plugin
                     return $event;
                 }
 
-                // Diagnostic logging to understand draft/revision behavior
-                $isDraft = ElementHelper::isDraft($event->element);
-                $isRevision = ElementHelper::isRevision($event->element);
-                $canonicalId = $event->element->getCanonicalId();
-                $elementId = $event->element->id;
-                $isCanonical = ($canonicalId === $elementId || $canonicalId === null);
-
-                AlgoliaSync::$plugin->algoliaSyncService->logger(
-                    "EVENT_AFTER_SAVE_ELEMENT - ID: {$elementId}, Canonical: {$canonicalId}, isDraft: " . ($isDraft ? 'true' : 'false') . ", isRevision: " . ($isRevision ? 'true' : 'false') . ", isCanonical: " . ($isCanonical ? 'true' : 'false'),
-                    basename(__FILE__),
-                    __LINE__
-                );
-
                 // Skip drafts and revisions - only sync canonical elements
                 if (ElementHelper::isDraftOrRevision($event->element)) {
-                    AlgoliaSync::$plugin->algoliaSyncService->logger(
-                        "Skipping draft/revision sync for element ID {$elementId} (canonical ID: {$canonicalId})",
-                        basename(__FILE__),
-                        __LINE__
-                    );
                     return $event;
                 }
 
