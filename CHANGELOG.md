@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 5.4.0 - 2026-06-02
+
+### Added
+- **Matrix field support**: Matrix field content is now indexed automatically, with no per-field configuration, including nested Matrix fields at unlimited depth. Each Matrix field produces a flattened searchable text attribute (`<handle>_text`) and a de-duplicated list of block types (`<handle>_blockTypes`) for faceting.
+- **Include Structured Matrix Payload** setting (off by default) to also store the full nested block structure on the record for front-ends that render results directly from Algolia.
+- **Sync Matrix Fields**, **Matrix Maximum Depth**, and **Record Size Budget** settings to control Matrix indexing behavior.
+
+### Changed
+- Records that exceed the configured size budget are now gracefully degraded (structured payloads dropped, then long text trimmed) instead of failing, keeping records under Algolia's size limit.
+
+### Fixed
+- Date fields that are empty no longer generate derived date attributes from a null value.
+
 ## 5.3.0 - 2026-06-02
 
 First stable release for Craft CMS 5, consolidating the 5.x beta line.

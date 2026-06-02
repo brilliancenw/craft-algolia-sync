@@ -47,6 +47,12 @@ class Settings extends Model
     public bool $appendSiteIdToDefaultSite = false; // append site ID to default site objectIDs
     public int $queuePriority = 50; // Queue job priority (lower = higher priority, default Craft is 1024)
 
+    // Matrix field syncing
+    public bool $syncMatrixFields = true;              // automatically index Matrix field content
+    public int $matrixMaxDepth = 10;                   // max nesting depth to traverse (size/perf cap)
+    public int $matrixTextByteBudget = 9000;           // max bytes for record attributes before degrading (Algolia limit ~10KB)
+    public bool $includeStructuredMatrixPayload = false; // also emit the full nested block object (off by default)
+
     public function getAlgoliaAdmin(): string
     {
         return App::parseEnv($this->algoliaAdmin);
