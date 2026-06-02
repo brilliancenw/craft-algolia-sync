@@ -550,321 +550,6 @@ class AlgoliaSyncService extends Component
         return null;
     }
 
-//    public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '') {
-//
-//        $elementInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element);
-//        $elementTypeSlug = $elementInfo['type'];
-//
-//        AlgoliaSync::$plugin->algoliaSyncService->logger("This type of item has been saved:: ".$elementTypeSlug, basename(__FILE__) , __LINE__);
-//        // do we update this type of element?
-//        $recordUpdate = array();
-//
-//        $okayToSync = AlgoliaSync::$plugin->algoliaSyncService->algoliaElementSynced($element);
-//
-//        if ($okayToSync) {
-//            AlgoliaSync::$plugin->algoliaSyncService->logger("We are going to sync", basename(__FILE__) , __LINE__);
-//
-//            // what type of element
-//            // user, entry, category
-//            $recordUpdate['attributes'] = array();
-//
-//            if ($action == 'delete') {
-//                $algoliaAction = 'delete';
-//            } else {
-//                if ($element->enabled) {
-//                    $algoliaAction = 'insert';
-//                } else {
-//                    $algoliaAction = 'delete';
-//                }
-//            }
-//            // get the attributes of the entity
-//            $recordUpdate['attributes']['objectID'] = $element->id.'-'.$element->siteId;
-//            $recordUpdate['attributes']['message'] = (int)$element->id;
-//
-//            // Get the list of enabled sites
-//            $enabledSitesIds = [];
-//            $enabledSiteHandles = [];
-//
-//            $allSites = Craft::$app->getSites()->getAllSites();
-//
-//            foreach ($allSites as $site) {
-//                // Query the database directly for the element's enabled status in this site
-//                $isEnabled = (new Query())
-//                    ->select(['enabled'])
-//                    ->from(['{{%elements_sites}}'])
-//                    ->where(['elementId' => $element->id, 'siteId' => $site->id])
-//                    ->scalar();
-//
-//                if ($isEnabled == 1) {
-//                    $enabledSitesIds[] = $site->id;
-//                    $enabledSiteHandles[] = $site->handle;
-//                }
-//            }
-//
-//            $recordUpdate['attributes']['siteIds'] = $enabledSitesIds;
-//            $recordUpdate['attributes']['siteHandles'] = $enabledSiteHandles;
-//
-//            if (isset($element->slug)) {
-//                $recordUpdate['attributes']['slug'] = $element->slug;
-//            }
-//            if (isset($element->authorId)) {
-//                $recordUpdate['attributes']['authorId'] = (int)$element->authorId;
-//            }
-//            if (isset($element->postDate)) {
-//                $recordUpdate['attributes']['postDate'] = (int)$element->postDate->getTimestamp();
-//            }
-//
-//            if (!empty($element->product)) {
-//                $fields = $element->product->getFieldLayout()->getCustomFields();
-//            } else {
-//                $fields = $element->getFieldLayout()->getCustomFields();
-//            }
-//
-//            $arrayFieldTypes = array('entries','tags','users');
-//
-//            foreach ($fields AS $field) {
-//                $fieldHandle = $field->handle;
-//
-//                // send this off to a function to extract the specific information
-//                // based on what type of field it is (asset, text, varchar, etc...)
-//                $fieldName = AlgoliaSync::$plugin->algoliaSyncService->sanitizeFieldName($field->name);
-//
-//                $rawData = AlgoliaSync::$plugin->algoliaSyncService->getFieldData($element, $field, $fieldHandle);
-//
-//                if ($rawData instanceof \craft\ckeditor\data\FieldData) {
-//                    $recordUpdate['attributes'][$fieldName] = $rawData->getRawContent();;
-//                    }
-//                elseif (isset($rawData['type']) && in_array($rawData['type'], $arrayFieldTypes)) {
-//                    $recordUpdate['attributes'][$fieldName] = $rawData['titles'];
-//                    $idsFieldName = $fieldName.'Ids';
-//                    $recordUpdate['attributes'][$idsFieldName] = $rawData['ids'];
-//                }
-//                elseif (isset($rawData['type']) && $rawData['type'] == 'mapfield') {
-//                    $recordUpdate['attributes'][$fieldName] = $rawData;
-//                    $recordUpdate['attributes'][$fieldName.'_address'] = $rawData['address'];
-//                    $recordUpdate['attributes'][$fieldName.'_lat'] = $rawData['lat'];
-//                    $recordUpdate['attributes'][$fieldName.'_lng'] = $rawData['lng'];
-//                    $recordUpdate['attributes'][$fieldName.'_zoom']['zoom'] = $rawData['zoom'];
-//                    if (!empty($rawData['lat']) && !empty($rawData['lng'])) {
-//                        // https://www.algolia.com/doc/guides/managing-results/refine-results/geolocation/#enabling-geo-search-by-adding-geolocation-data-to-records
-//                        // inject a _geoloc into Algolia
-//                        // this doesn't take into account if there are multiple _geoloc...
-//                        // that will be more complex to resolve
-//                        $recordUpdate['attributes']['_geoloc'] = [];
-//                        $recordUpdate['attributes']['_geoloc']['lat'] = $rawData['lat'];
-//                        $recordUpdate['attributes']['_geoloc']['lng'] = $rawData['lng'];
-//                    }
-//                }
-//                elseif (isset($rawData['type']) && $rawData['type'] == 'categories') {
-//
-//                    $recordUpdate['attributes'][$fieldName] = $rawData['flat'];
-//                    $nestedName = $fieldName."_hx";
-//                    $recordUpdate['attributes'][$nestedName] = $rawData['nested'];
-//
-//                }
-//                else {
-//                    $recordUpdate['attributes'][$fieldName] = $rawData;
-//                }
-//
-//                $fieldTypeLong = get_class($field);
-//                $fieldTypeArray = explode('\\', $fieldTypeLong);
-//                $fieldType = strtolower(array_pop($fieldTypeArray));
-//
-//                // for the date field, create a few versions of the date
-//                // todo : add in a config for custom date format to be added
-//                if ($fieldType == 'date') {
-//                    // get the friendly date
-//                    $friendlyName = $fieldName . "_friendly";
-//                    $friendlyDate = date('n/j/Y', $rawData);
-//                    $recordUpdate['attributes'][$friendlyName] = $friendlyDate;
-//
-//                    // get the previous midnight of the current date (unix timestamp)
-//                    $midnightName = $fieldName . "_midnight";
-//                    $midnightTimestamp = mktime(0, 0, 0, date('n', $rawData), date('j', $rawData), date('Y', $rawData));
-//                    $recordUpdate['attributes'][$midnightName] = $midnightTimestamp;
-//                }
-//            }
-//
-//            $recordUpdate['index'] = AlgoliaSync::$plugin->algoliaSyncService->getAlgoliaIndex($element);
-//
-//            switch ($elementTypeSlug) {
-//                case 'category':
-//                case 'entry':
-//                case 'asset':
-//                case 'tag':
-//
-//                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
-//                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
-//                    $recordUpdate['attributes']['title'] = $element->title;
-//                    break;
-//
-//                case 'user':
-//                    $recordUpdate['elementType'] = 'User';
-//                    $recordUpdate['handle'] = $elementInfo['sectionHandle'];
-//                    $recordUpdate['attributes']['title'] = $element->username;
-//                    $recordUpdate['attributes']['firstname'] = $element->firstName;
-//                    $recordUpdate['attributes']['lastname'] = $element->lastName;
-//                    $recordUpdate['attributes']['email'] = $element->email;
-//                    $userGroups = $element->getGroups();
-//                    $groupList = [];
-//                    foreach ($userGroups AS $group) {
-//                        $groupList[] = $group->handle;
-//                    }
-//                    $recordUpdate['attributes']['userGroups'] = $groupList;
-//                    break;
-//
-//                case 'product':
-//
-//                    $defaultVariant = $element->defaultVariant;
-//
-//                    if (isset($defaultVariant) &&  isset($defaultVariant->onSale)) {
-//                        $salePrice = (float)$defaultVariant->salePrice;
-//                        $onSale = true;
-//                    }
-//                    else {
-//                        $salePrice = null;
-//                        $onSale = false;
-//                    }
-//
-//                    AlgoliaSync::$plugin->algoliaSyncService->logger("Product is being loaded", basename(__FILE__) , __LINE__);
-//
-//                    // get the basic product info
-//                    $recordUpdate['elementType'] = ucwords($elementTypeSlug);
-//                    $recordUpdate['handle'] = $elementInfo['sectionHandle'][0] ?? null;
-//                    $recordUpdate['attributes']['title'] = $element->title ?? null;
-//
-//                    if (isset($element->id)) {
-//                        $recordUpdate['attributes']['productId'] = $element->id;
-//                    }
-//                    if (isset($element->typeId)) {
-//                        $recordUpdate['attributes']['typeId'] = $element->typeId;
-//                    }
-//                    if (isset($element->taxCategoryId)) {
-//                        $recordUpdate['attributes']['taxCategoryId'] = $element->taxCategoryId;
-//                    }
-//                    if (isset($element->shippingCategoryId)) {
-//                        $recordUpdate['attributes']['shippingCategoryId'] = $element->shippingCategoryId;
-//                    }
-//                    if (isset($element->defaultSku)) {
-//                        $recordUpdate['attributes']['defaultSku'] = $element->defaultSku;
-//                    }
-//                    if (isset($element->availableForPurchase)) {
-//                        $recordUpdate['attributes']['availableForPurchase'] = (bool)$element->availableForPurchase;
-//                    }
-//                    if (isset($element->defaultVariantId)) {
-//                        $recordUpdate['attributes']['defaultVariantId'] = (int)$element->defaultVariantId;
-//                    }
-//                    if (isset($element->defaultPrice)) {
-//                        $recordUpdate['attributes']['defaultPrice'] = (float)$element->defaultPrice;
-//                    }
-//                    if (isset($element->defaultWidth)) {
-//                        $recordUpdate['attributes']['defaultWidth'] = $element->defaultWidth;
-//                    }
-//                    if (isset($element->defaultHeight)) {
-//                        $recordUpdate['attributes']['defaultHeight'] = $element->defaultHeight;
-//                    }
-//                    if (isset($element->defaultLength)) {
-//                        $recordUpdate['attributes']['defaultLength'] = $element->defaultLength;
-//                    }
-//                    if (isset($element->defaultWeight)) {
-//                        $recordUpdate['attributes']['defaultWeight'] = $element->defaultWeight;
-//                    }
-//                    if (isset($element->taxCategory)) {
-//                        $recordUpdate['attributes']['taxCategory'] = $element->taxCategory;
-//                    }
-//
-//
-//                    if (isset($elementInfo['productTypeName'])) {
-//                        $recordUpdate['attributes']['ProductType'] = $elementInfo['productTypeName'];
-//                    }
-//
-//                    if (isset($onSale)) {
-//                        $recordUpdate['attributes']['onSale'] = $onSale; // Assuming $onSale is already a boolean or correct type
-//                    }
-//                    if (isset($salePrice)) {
-//                        $recordUpdate['attributes']['salePrice'] = $salePrice; // Assuming $salePrice is already a number/string or correct type
-//                    }
-//
-//                    // now load all variants
-//                    $getAllVariants = \craft\commerce\elements\Variant::find()->productId($element->id);
-//
-//                    $recordUpdate['attributes']['variants'] = [];
-//
-//                    foreach ($getAllVariants AS $variantDetails) {
-//
-//                        $variantInfo = [];
-//
-//                        $variantInfo['title'] = $variantDetails->title ?? null;
-//
-//                        $variantInfo['variantId'] = $variantDetails->id ?? null;
-//
-//                        if (isset($variantDetails->productId)) {
-//                            $variantInfo['productId'] = (int)$variantDetails->productId;
-//                        }
-//                        if (isset($variantDetails->isDefault)) {
-//                            $variantInfo['isDefault'] = (bool)$variantDetails->isDefault;
-//                        }
-//                        if (isset($variantDetails->price)) {
-//                            $variantInfo['price'] = (float)$variantDetails->price;
-//                        }
-//                        if (isset($variantDetails->sortOrder)) {
-//                            $variantInfo['sortOrder'] = (int)$variantDetails->sortOrder;
-//                        }
-//                        if (isset($variantDetails->width)) {
-//                            $variantInfo['width'] = (float)$variantDetails->width;
-//                        }
-//                        if (isset($variantDetails->height)) {
-//                            $variantInfo['height'] = (float)$variantDetails->height;
-//                        }
-//                        if (isset($variantDetails->length)) {
-//                            $variantInfo['length'] = (float)$variantDetails->length;
-//                        }
-//                        if (isset($variantDetails->stock)) {
-//                            $variantInfo['stock'] = (int)$variantDetails->stock;
-//                        }
-//                        if (isset($variantDetails->weight)) {
-//                            $variantInfo['weight'] = (float)$variantDetails->weight;
-//                        }
-//                        if (isset($variantDetails->hasUnlimitedStock)) {
-//                            $variantInfo['hasUnlimitedStock'] = (bool)$variantDetails->hasUnlimitedStock;
-//                        }
-//                        if (isset($variantDetails->minQty)) {
-//                            $variantInfo['minQty'] = (int)$variantDetails->minQty;
-//                        }
-//                        if (isset($variantDetails->maxQty)) {
-//                            // Note: maxQty might be 0 or null when there's no maximum.
-//                            // isset() handles the null case. If 0 is a meaningful value you want,
-//                            // this check is still correct as 0 is considered "set".
-//                            $variantInfo['maxQty'] = (int)$variantDetails->maxQty;
-//                        }
-//
-//                        // nest each variant under the product info
-//                        $recordUpdate['attributes']['variants'][] = $variantInfo;
-//
-//                    }
-//
-//                    break;
-//
-//            }
-//
-//            // Fire event for tracking before the sync event.
-//            $event = new beforeAlgoliaSyncEvent([
-//                'recordElement' => $element,
-//                'recordUpdate' => $recordUpdate
-//            ]);
-//
-//            $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
-//            $recordUpdate = $event->recordUpdate;
-//
-//            // $recordUpdate['elementType']
-//            AlgoliaSync::$plugin->algoliaSyncService->algoliaSyncRecord($algoliaAction, $recordUpdate, $algoliaMessage);
-//        }
-//        else {
-//            AlgoliaSync::$plugin->algoliaSyncService->logger("Not okay to sync...", basename(__FILE__) , __LINE__);
-//        }
-//    }
-
-
     public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '')
     {
         // Gather element info and short-circuit if not synced
@@ -1264,11 +949,24 @@ class AlgoliaSyncService extends Component
                 foreach ($syncedGroupsArray AS $groupId => $groupData) {
                     if (!empty($groupData['sync'])) {
                         // does this have a custom index name?
-                        $potentialIndexOverride = $groupData['customIndex'];
+                        $potentialIndexOverride = $groupData['customIndex'] ?? null;
 
                         if (!empty($potentialIndexOverride)) {
                             // is that name an env variable?
-                            $syncedGroups[] = App::parseEnv($potentialIndexOverride);
+                            $resolvedIndex = App::parseEnv($potentialIndexOverride);
+
+                            // Skip (and log) an override that resolves to an empty value
+                            // rather than adding a null index that would fail in the queue.
+                            if (empty($resolvedIndex)) {
+                                $this->logger(
+                                    "Custom index override '{$potentialIndexOverride}' for user group {$groupId} resolved to an empty value - is the environment variable defined in this environment?",
+                                    basename(__FILE__),
+                                    __LINE__
+                                );
+                            }
+                            else {
+                                $syncedGroups[] = $resolvedIndex;
+                            }
                         }
                         else {
                             // otherwise, use the default convention
@@ -1375,13 +1073,39 @@ class AlgoliaSyncService extends Component
         $allSettings = AlgoliaSync::$plugin->getSettings();
         $eventInfo = AlgoliaSync::$plugin->algoliaSyncService->getEventElementInfo($element, false);
 
+        $overrideConfigured = false;
+
         foreach ($eventInfo['sectionId'] as $sectionId) {
-            $potentialIndexOverride = $allSettings['algoliaElements'][$eventInfo['type']][$sectionId]['customIndex'];
+            $potentialIndexOverride = $allSettings['algoliaElements'][$eventInfo['type']][$sectionId]['customIndex'] ?? null;
 
             if (!empty($potentialIndexOverride)) {
-                $returnIndex[] = App::parseEnv($potentialIndexOverride);
+                $overrideConfigured = true;
+                $resolvedIndex = App::parseEnv($potentialIndexOverride);
+
+                // A custom index override that references an environment variable
+                // (e.g. "$ORGANIZATIONS_INDEX_NAME") resolves to null when that variable
+                // is not defined in the current environment. Skip it with a clear log
+                // rather than queueing a sync job with a null index, which would otherwise
+                // fail later in the queue with a cryptic "indexName is required" error.
+                if (empty($resolvedIndex)) {
+                    $this->logger(
+                        "Custom index override '{$potentialIndexOverride}' for {$eventInfo['type']}/{$sectionId} resolved to an empty value - is the environment variable defined in this environment?",
+                        basename(__FILE__),
+                        __LINE__
+                    );
+                    continue;
+                }
+
+                $returnIndex[] = $resolvedIndex;
                 return $returnIndex;
             }
+        }
+
+        // If a custom index override was configured but could not be resolved, do not
+        // fall back to the default index name - that would route data to an unexpected
+        // index. Return an empty array so the element is skipped (and logged) instead.
+        if ($overrideConfigured && empty($returnIndex)) {
+            return $returnIndex;
         }
 
         $env = $this->getEnvironment();
