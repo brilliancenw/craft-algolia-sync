@@ -75,6 +75,49 @@
 }) }}
 
 <hr>
+<h1>Matrix Fields</h1>
+
+{{ forms.lightswitchField({
+    label: 'Sync Matrix Fields',
+    instructions: 'Automatically index the content of Matrix fields, including nested Matrix fields at any depth. Each Matrix field produces a searchable text attribute ("<handle>_text") and a list of block types ("<handle>_blockTypes") for faceting.',
+    id: 'syncMatrixFields',
+    name: 'syncMatrixFields',
+    on: settings.syncMatrixFields ?? true,
+}) }}
+
+{{ forms.textField({
+    label: 'Matrix Maximum Depth',
+    instructions: 'How many levels of nested Matrix fields to traverse. Protects record size and indexing performance on deeply nested content.',
+    id: 'matrixMaxDepth',
+    name: 'matrixMaxDepth',
+    value: settings.matrixMaxDepth ?? 10,
+    type: 'number',
+    min: 1,
+    max: 50,
+    size: 5,
+}) }}
+
+{{ forms.textField({
+    label: 'Record Size Budget (bytes)',
+    instructions: 'Maximum size for a record before it is gracefully degraded (structured payloads dropped, long text trimmed). Algolia rejects records larger than ~10,000 bytes on most plans.',
+    id: 'matrixTextByteBudget',
+    name: 'matrixTextByteBudget',
+    value: settings.matrixTextByteBudget ?? 9000,
+    type: 'number',
+    min: 1000,
+    max: 100000,
+    size: 7,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Include Structured Matrix Payload',
+    instructions: 'In addition to the searchable text, also store the full nested block structure as an object on the record. Off by default. Enable this only if your front-end renders results directly from the Algolia record, as it significantly increases record size.',
+    id: 'includeStructuredMatrixPayload',
+    name: 'includeStructuredMatrixPayload',
+    on: settings.includeStructuredMatrixPayload ?? false,
+}) }}
+
+<hr>
 <h1>Bulk Load of Records</h1>
 <a href="{{ cpUrl('utilities/algolia-sync-utility') }}" class="go">Visit the Utilities Page to Bulk Load Records</a>
 

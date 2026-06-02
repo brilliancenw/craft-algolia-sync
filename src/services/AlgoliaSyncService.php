@@ -390,7 +390,7 @@ class AlgoliaSyncService extends Component
             }
         }
     }
-    public function getFieldData($element, $field, $fieldHandle): mixed
+    public function getFieldData($element, $field, $fieldHandle, int $depth = 0): mixed
     {
         if (get_class($field) === 'craft\ckeditor\Field') {
             $fieldType = 'ckeditor';
@@ -454,6 +454,72 @@ class AlgoliaSyncService extends Component
                     'type' => $fieldType,
                     'ids'   => $idsArray,
                     'titles'    => $titlesArray
+                );
+
+            case 'matrix':
+                $settings = AlgoliaSync::$plugin->getSettings();
+
+                if (!$settings->syncMatrixFields) {
+                    return null;
+                }
+
+                // maxMatrixDepth is a size/performance control. Saved Matrix content is a
+                // finite tree (a block cannot contain itself), so this is not needed for
+                // correctness - it simply caps how deep we will traverse and index.
+                if ($depth >= $settings->matrixMaxDepth) {
+                    $this->logger(
+                        "Matrix max depth ({$settings->matrixMaxDepth}) reached at field '{$fieldHandle}'; not recursing further",
+                        basename(__FILE__),
+                        __LINE__
+                    );
+                    return null;
+                }
+
+                // In Craft 5 a Matrix field's value is an EntryQuery of nested entries (blocks).
+                // Index enabled blocks only.
+                $blocks = $element->$fieldHandle->status('enabled')->all();
+
+                $structuredBlocks = [];
+                $blockTypes = [];
+                $textParts = [];
+
+                foreach ($blocks as $block) {
+                    if (!($block instanceof \craft\elements\Entry)) {
+                        continue;
+                    }
+
+                    $blockTypeHandle = $block->getType()->handle;
+                    $blockTypes[] = $blockTypeHandle;
+
+                    // A block is an Entry with its own field layout - recurse using the same
+                    // per-field mapping so nested Matrix fields, relations, dates, maps, etc.
+                    // are all handled identically at any depth.
+                    $blockAttributes = $this->buildAttributesForElement($block, $depth + 1, false);
+
+                    // Bubble up block-type handles discovered in nested Matrix fields so the
+                    // top-level _blockTypes facet lists every type at every depth.
+                    foreach ($blockAttributes as $attrKey => $attrVal) {
+                        if (is_array($attrVal) && str_ends_with($attrKey, '_blockTypes')) {
+                            $blockTypes = array_merge($blockTypes, $attrVal);
+                        }
+                    }
+
+                    $blockText = $this->extractSearchableText($blockAttributes);
+                    if ($blockText !== '') {
+                        $textParts[] = $blockText;
+                    }
+
+                    $structuredBlocks[] = array_merge(
+                        ['_blockType' => $blockTypeHandle, '_blockLevel' => $depth],
+                        $blockAttributes
+                    );
+                }
+
+                return array(
+                    'type'       => 'matrix',
+                    'text'       => implode('. ', $textParts),
+                    'blockTypes' => array_values(array_unique($blockTypes)),
+                    'blocks'     => $structuredBlocks,
                 );
 
             case 'number':
@@ -548,6 +614,191 @@ class AlgoliaSyncService extends Component
                 return $mapInfo;
         }
         return null;
+    }
+
+    /**
+     * Build the Algolia attribute array for a single element by iterating its custom fields
+     * and mapping each field's getFieldData() result into attributes.
+     *
+     * This is shared by the top-level element and by every nested Matrix block (which are
+     * themselves entries), so a block's fields get the exact same treatment at any depth.
+     *
+     * @param mixed $element The element (entry, user, product, or nested Matrix block)
+     * @param int $depth Current nesting depth (0 = top-level element)
+     * @param bool $isRoot True for the top-level element; controls root-only promotions like _geoloc
+     * @return array
+     */
+    public function buildAttributesForElement($element, int $depth = 0, bool $isRoot = true): array
+    {
+        $settings = AlgoliaSync::$plugin->getSettings();
+        $attributes = [];
+        $arrayFieldTypes = ['entries', 'tags', 'users'];
+
+        $fieldLayout = $element->getFieldLayout();
+        $fields = $fieldLayout ? $fieldLayout->getCustomFields() : [];
+
+        foreach ($fields as $field) {
+            $handle = $field->handle;
+            $name = $this->sanitizeFieldName($field->name);
+            $raw = $this->getFieldData($element, $field, $handle, $depth);
+
+            if ($raw instanceof \craft\ckeditor\data\FieldData) {
+                $attributes[$name] = $raw->getRawContent();
+            } elseif (isset($raw['type']) && in_array($raw['type'], $arrayFieldTypes)) {
+                $attributes[$name] = $raw['titles'];
+                $attributes[$name . 'Ids'] = $raw['ids'];
+            } elseif (isset($raw['type']) && $raw['type'] === 'mapfield') {
+                $attributes[$name] = $raw;
+                $attributes[$name . '_address'] = $raw['address'];
+                $attributes[$name . '_lat'] = $raw['lat'];
+                $attributes[$name . '_lng'] = $raw['lng'];
+                $attributes[$name . '_zoom'] = $raw['zoom'];
+                // _geoloc is Algolia's reserved geo key and must live at the record root,
+                // so only promote it for the top-level element, never for nested blocks.
+                if ($isRoot && !empty($raw['lat']) && !empty($raw['lng'])) {
+                    $attributes['_geoloc'] = [
+                        'lat' => $raw['lat'],
+                        'lng' => $raw['lng'],
+                    ];
+                }
+            } elseif (isset($raw['type']) && $raw['type'] === 'categories') {
+                $attributes[$name] = $raw['flat'];
+                $attributes[$name . '_hx'] = $raw['nested'];
+            } elseif (isset($raw['type']) && $raw['type'] === 'matrix') {
+                // Flattened searchable text and a flat block-type facet array are always emitted.
+                // The structured nested object is opt-in (off by default) due to record size.
+                $attributes[$name . '_text'] = $raw['text'];
+                $attributes[$name . '_blockTypes'] = $raw['blockTypes'];
+                if ($settings->includeStructuredMatrixPayload) {
+                    $attributes[$name] = [
+                        'type' => 'matrix',
+                        'blocks' => $raw['blocks'],
+                    ];
+                }
+            } else {
+                $attributes[$name] = $raw;
+            }
+
+            // Friendly date formats
+            $classParts = explode('\\', get_class($field));
+            $fieldType = strtolower(end($classParts));
+            if ($fieldType === 'date' && $raw) {
+                $ts = $raw;
+                $attributes[$name . '_friendly'] = date('n/j/Y', $ts);
+                $attributes[$name . '_midnight'] = mktime(
+                    0, 0, 0,
+                    date('n', $ts),
+                    date('j', $ts),
+                    date('Y', $ts)
+                );
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Extract a flat, human-readable searchable string from a built attribute array.
+     * Used to roll Matrix block content (at any depth) into a single text aggregate.
+     *
+     * Skips identifier, facet, and coordinate keys that add noise rather than search value,
+     * and skips associative arrays (structured payloads) - their text is already represented
+     * by sibling *_text strings.
+     *
+     * @param array $attributes
+     * @return string
+     */
+    private function extractSearchableText(array $attributes): string
+    {
+        $skipSuffixes = ['Ids', '_blockTypes', '_midnight', '_lat', '_lng', '_zoom', '_hx'];
+        $parts = [];
+
+        foreach ($attributes as $key => $value) {
+            $skip = false;
+            foreach ($skipSuffixes as $suffix) {
+                if (str_ends_with($key, $suffix)) {
+                    $skip = true;
+                    break;
+                }
+            }
+            if ($skip) {
+                continue;
+            }
+
+            if (is_string($value)) {
+                $clean = trim(strip_tags($value));
+                if ($clean !== '') {
+                    $parts[] = $clean;
+                }
+            } elseif (is_array($value) && array_is_list($value)) {
+                // Flat list of scalar values (e.g. relation titles, multiselect labels)
+                foreach ($value as $item) {
+                    if (is_string($item)) {
+                        $clean = trim($item);
+                        if ($clean !== '') {
+                            $parts[] = $clean;
+                        }
+                    }
+                }
+            }
+            // Numbers, booleans, and associative arrays are intentionally skipped.
+        }
+
+        return implode('. ', $parts);
+    }
+
+    /**
+     * Ensure a record's attribute payload stays under the configured byte budget (Algolia
+     * rejects records over ~10KB). Degrades gracefully rather than letting the queue job throw:
+     * first drops opt-in structured Matrix payloads, then trims the largest string attributes.
+     *
+     * @param array $attributes
+     * @param int $elementId For log context
+     * @return array
+     */
+    private function enforceRecordSizeBudget(array $attributes, int $elementId): array
+    {
+        $budget = AlgoliaSync::$plugin->getSettings()->matrixTextByteBudget;
+        if ($budget <= 0) {
+            return $attributes;
+        }
+
+        $originalSize = strlen(json_encode($attributes));
+        if ($originalSize <= $budget) {
+            return $attributes;
+        }
+
+        // Step 1: drop opt-in structured Matrix payloads (largest, least search value).
+        foreach ($attributes as $key => $value) {
+            if (is_array($value) && ($value['type'] ?? null) === 'matrix') {
+                unset($attributes[$key]);
+            }
+        }
+
+        // Step 2: if still over, iteratively trim the largest string attribute.
+        while (strlen(json_encode($attributes)) > $budget) {
+            $longestKey = null;
+            $longestLen = 0;
+            foreach ($attributes as $key => $value) {
+                if (is_string($value) && strlen($value) > $longestLen) {
+                    $longestKey = $key;
+                    $longestLen = strlen($value);
+                }
+            }
+            if ($longestKey === null || $longestLen <= 50) {
+                break; // nothing meaningful left to trim
+            }
+            $attributes[$longestKey] = mb_substr($attributes[$longestKey], 0, (int)floor($longestLen / 2));
+        }
+
+        $finalSize = strlen(json_encode($attributes));
+        $this->logger(
+            "Record for element {$elementId} exceeded the size budget ({$originalSize} > {$budget} bytes); degraded to {$finalSize} bytes (structured Matrix payloads dropped and/or large text trimmed).",
+            basename(__FILE__),
+            __LINE__
+        );
+
+        return $attributes;
     }
 
     public function prepareAlgoliaSyncElement($element, $action = 'save', $algoliaMessage = '')
@@ -725,56 +976,15 @@ class AlgoliaSyncService extends Component
                 // nest each variant under the product info
                 $recordTemplate['attributes']['variants'][] = $variantInfo;
             }
-            $fields = $element->getFieldLayout()->getCustomFields();
-        } else {
-
-            $fields = $element->getFieldLayout()->getCustomFields();
         }
-        $arrayFieldTypes = ['entries', 'tags', 'users'];
 
-        foreach ($fields as $field) {
-            $handle = $field->handle;
-            $name = $this->sanitizeFieldName($field->name);
-            $raw = $this->getFieldData($element, $field, $handle);
-
-            if ($raw instanceof \craft\ckeditor\data\FieldData) {
-                $recordTemplate['attributes'][$name] = $raw->getRawContent();
-            } elseif (isset($raw['type']) && in_array($raw['type'], $arrayFieldTypes)) {
-                $recordTemplate['attributes'][$name] = $raw['titles'];
-                $recordTemplate['attributes'][$name . 'Ids'] = $raw['ids'];
-            } elseif (isset($raw['type']) && $raw['type'] === 'mapfield') {
-                $recordTemplate['attributes'][$name] = $raw;
-                $recordTemplate['attributes'][$name . '_address'] = $raw['address'];
-                $recordTemplate['attributes'][$name . '_lat'] = $raw['lat'];
-                $recordTemplate['attributes'][$name . '_lng'] = $raw['lng'];
-                $recordTemplate['attributes'][$name . '_zoom'] = $raw['zoom'];
-                if (!empty($raw['lat']) && !empty($raw['lng'])) {
-                    $recordTemplate['attributes']['_geoloc'] = [
-                        'lat' => $raw['lat'],
-                        'lng' => $raw['lng'],
-                    ];
-                }
-            } elseif (isset($raw['type']) && $raw['type'] === 'categories') {
-                $recordTemplate['attributes'][$name] = $raw['flat'];
-                $recordTemplate['attributes'][$name . '_hx'] = $raw['nested'];
-            } else {
-                $recordTemplate['attributes'][$name] = $raw;
-            }
-
-            // Friendly date formats
-            $classParts = explode('\\', get_class($field));
-            $fieldType = strtolower(end($classParts));
-            if ($fieldType === 'date') {
-                $ts = $raw;
-                $recordTemplate['attributes'][$name . '_friendly'] = date('n/j/Y', $ts);
-                $recordTemplate['attributes'][$name . '_midnight'] = mktime(
-                    0, 0, 0,
-                    date('n', $ts),
-                    date('j', $ts),
-                    date('Y', $ts)
-                );
-            }
-        }
+        // Build custom field attributes. This is extracted into a reusable method so that
+        // Matrix blocks (which are nested entries with their own field layouts) receive the
+        // exact same per-field treatment at every depth.
+        $recordTemplate['attributes'] = array_merge(
+            $recordTemplate['attributes'],
+            $this->buildAttributesForElement($element, 0, true)
+        );
 
         // Determine which sites to sync
         // Only sync the current site when bulk‑loading or saving
@@ -808,6 +1018,15 @@ class AlgoliaSyncService extends Component
         ]);
         $this->trigger(self::EVENT_BEFORE_ALGOLIA_SYNC, $event);
         $recordTemplate = $event->recordUpdate;
+
+        // Keep the record under Algolia's size limit. Only relevant for inserts (deletes
+        // carry just an objectID). Degrades gracefully rather than letting the queue job throw.
+        if ($algoliaAction === 'insert' && !empty($recordTemplate['attributes'])) {
+            $recordTemplate['attributes'] = $this->enforceRecordSizeBudget(
+                $recordTemplate['attributes'],
+                (int)$element->id
+            );
+        }
 
         // Queue a record per site
         foreach ($enabledSites as $siteId => $info) {

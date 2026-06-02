@@ -248,6 +248,40 @@ Product records include:
 - Sale pricing and on-sale flags
 - Stock information
 
+### Matrix Fields
+
+Matrix field content is indexed automatically, with no per-field configuration. Because Craft 5 Matrix blocks are nested entries that can themselves contain Matrix fields, content of virtually unlimited depth is supported. The content is flattened into a search-friendly shape rather than mirrored as a deep object tree, which keeps records well within Algolia's size limit and gives reliable relevance and faceting.
+
+For a Matrix field with the handle `documentation`, each record gets:
+
+- `documentation_text` (string) - a flattened, searchable aggregate of the text from every block at every depth. Point your index's searchable attributes here.
+- `documentation_blockTypes` (array of strings) - a de-duplicated list of every block (entry type) handle found at any depth, ideal for faceting (for example, "show entries that contain a `callToAction` block").
+- `documentation` (object) - the full nested block structure. This is **optional and off by default**; enable **Include Structured Matrix Payload** in the settings only if your front-end renders results directly from the Algolia record.
+
+Example: a product with a `documentation` Matrix field containing three `document` blocks, where each document has its own `relatedDocuments` Matrix field, produces:
+
+```json
+{
+  "documentation_text": "Installation Guide. How to install the Widget Pro. Quick Start. 5 minute setup. Safety Sheet. User Manual. Complete reference. Warranty. 2 year warranty terms. Claim Form.",
+  "documentation_blockTypes": ["document", "relatedDoc"]
+}
+```
+
+The flattened text answers "does this entry mention X?" perfectly at any depth. The optional structured payload is what preserves which related document belongs to which parent document, when you need that association for display.
+
+Settings (under **Settings → Algolia Sync → Matrix Fields**):
+
+- **Sync Matrix Fields** - master toggle (on by default).
+- **Matrix Maximum Depth** - how many nested levels to traverse (default 10).
+- **Record Size Budget (bytes)** - records over this size are gracefully degraded (structured payload dropped, then long text trimmed) rather than failing. Default 9000, under Algolia's ~10,000-byte limit.
+- **Include Structured Matrix Payload** - emit the full nested object (off by default).
+
+For per-field or per-entry customization, use the `EVENT_BEFORE_ALGOLIA_SYNC` event (see [Event System](#event-system)) to adjust the record before it is sent to Algolia.
+
+> Note: CKEditor fields are indexed as their rendered text. Entries embedded inside a CKEditor field are not yet recursed into; this is planned for a future release.
+
+> After enabling Matrix syncing on existing content, run a bulk load (below) so the new attributes are populated on records that have not been re-saved.
+
 ## Bulk Loading
 
 To initially populate or refresh your Algolia indexes:
