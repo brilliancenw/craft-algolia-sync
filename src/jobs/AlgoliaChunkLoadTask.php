@@ -17,6 +17,7 @@ use craft\base\Element;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
+use craft\elements\Asset;
 use craft\commerce\elements\Product;
 
 class AlgoliaChunkLoadTask extends BaseJob
@@ -92,6 +93,15 @@ class AlgoliaChunkLoadTask extends BaseJob
                     ->limit($limit);
                 break;
 
+            case 'asset':
+                $query = Asset::find()
+                    ->volumeId($sectionId)
+                    ->site('*')
+                    ->orderBy([])
+                    ->offset($offset)
+                    ->limit($limit);
+                break;
+
             default:
                 Craft::error("Unknown elementType: {$elementType}", __METHOD__);
                 return;
@@ -156,6 +166,9 @@ class AlgoliaChunkLoadTask extends BaseJob
                     break;
                 case 'user':
                     $allSites = User::find()->id($id)->site('*')->all();
+                    break;
+                case 'asset':
+                    $allSites = Asset::find()->id($id)->site('*')->all();
                     break;
             }
 

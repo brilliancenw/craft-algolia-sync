@@ -16,6 +16,7 @@ use craft\queue\BaseJob;
 use craft\elements\Entry;
 use craft\elements\Category;
 use craft\elements\User;
+use craft\elements\Asset;
 use craft\commerce\elements\Product;
 use yii\queue\RetryableJobInterface;
 
@@ -93,6 +94,9 @@ class AlgoliaBulkLoadTask extends BaseJob implements RetryableJobInterface
                 $query = User::find()->groupId($sectionId)->site('*');
                 break;
 
+            case 'asset':
+                $query = Asset::find()->volumeId($sectionId)->site('*');
+                break;
             default:
                 Craft::error("Unknown element type: {$elementType}", __METHOD__);
                 return;
